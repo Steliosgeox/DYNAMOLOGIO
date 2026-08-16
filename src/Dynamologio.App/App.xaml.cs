@@ -26,6 +26,23 @@ namespace Dynamologio.App
         {
             base.OnStartup(e);
 
+            // Hook Unhandled Exception Handlers
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+            {
+                LogUnhandledException(args.ExceptionObject as Exception, "AppDomain");
+            };
+
+            DispatcherUnhandledException += (s, args) =>
+            {
+                LogUnhandledException(args.Exception, "Dispatcher");
+                args.Handled = true;
+                MessageBox.Show(
+                    $"Παρουσιάστηκε μη αναμενόμενο σφάλμα:\n\n{args.Exception.Message}\n\nΤα τεχνικά στοιχεία καταγράφηκαν στο αρχείο σφαλμάτων.",
+                    "Σφάλμα Εφαρμογής",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            };
+
             // 1. Enforce el-GR culture throughout application runtime
             var greekCulture = new CultureInfo("el-GR");
             Thread.CurrentThread.CurrentCulture = greekCulture;
@@ -92,6 +109,26 @@ namespace Dynamologio.App
                     MessageBoxImage.Error);
 
                 Shutdown(1);
+            }
+        }
+
+        private static void LogUnhandledException(Exception ex, string source)
+        {
+            if (ex == null) return;
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                if (string.IsNullOrEmpty(appData)) appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string logDir = Path.Combine(appData, "Dynamologio", "Logs");
+                if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+
+                string logFile = Path.Combine(logDir, "app_crash.log");
+                string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}] {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n\n";
+                File.AppendAllText(logFile, logEntry);
+            }
+            catch
+            {
+                // Silent fail
             }
         }
 

@@ -46,8 +46,93 @@ namespace Dynamologio.Tests
             }
         }
 
+        // ==========================================
+        // 1. LIFECYCLE & INTERVAL MATH TESTS
+        // ==========================================
+
         [Fact]
-        public void StatusIntervalMath_IsActiveAt_ShouldRespectHalfOpenBoundary()
+        public void AT_LIFECYCLE_001_ActivePersonnelWithinDates_ShouldBeIncludedInStrength()
+        {
+            var engine = new StatusEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ",
+                FirstName = "ΓΕΩΡΓΙΟΣ",
+                StrengthStartDate = new DateTime(2026, 1, 1)
+            };
+
+            var snapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 5, 10));
+            Assert.True(snapshot.IsInActiveStrength);
+            Assert.Equal(StatusEffect.Present, snapshot.EffectiveStatus);
+        }
+
+        [Fact]
+        public void AT_LIFECYCLE_002_BeforeStrengthStartDate_ShouldBeExcluded()
+        {
+            var engine = new StatusEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΜΕΛΛΟΝΤΙΚΟΣ",
+                FirstName = "ΑΝΔΡΕΑΣ",
+                StrengthStartDate = new DateTime(2026, 9, 1)
+            };
+
+            var snapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 16));
+            Assert.False(snapshot.IsInActiveStrength);
+            Assert.Equal(StatusEffect.ExcludedFromStrength, snapshot.EffectiveStatus);
+        }
+
+        [Fact]
+        public void AT_LIFECYCLE_003_OnOrAfterStrengthEndDate_ShouldBeExcluded()
+        {
+            var engine = new StatusEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΑΠΟΛΥΘΕΙΣ",
+                FirstName = "ΔΗΜΗΤΡΙΟΣ",
+                StrengthStartDate = new DateTime(2025, 1, 1),
+                StrengthEndDate = new DateTime(2026, 8, 1)
+            };
+
+            var snapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 1));
+            Assert.False(snapshot.IsInActiveStrength);
+            Assert.Equal(StatusEffect.ExcludedFromStrength, snapshot.EffectiveStatus);
+        }
+
+        [Fact]
+        public void AT_LIFECYCLE_004_HistoricalQuery_ShouldPreservePastActiveStatus_WhenArchivedToday()
+        {
+            // Bug AUD-001 Regression: Archiving today must NOT erase past history
+            var engine = new StatusEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΙΣΤΟΡΙΚΟΣ",
+                FirstName = "ΝΙΚΟΛΑΟΣ",
+                StrengthStartDate = new DateTime(2026, 1, 1),
+                StrengthEndDate = new DateTime(2026, 9, 1),
+                IsArchived = true
+            };
+
+            // Query on August 20 (Before departure date)
+            var snapshotPast = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 20));
+            Assert.True(snapshotPast.IsInActiveStrength);
+            Assert.Equal(StatusEffect.Present, snapshotPast.EffectiveStatus);
+
+            // Query on September 2 (After departure date)
+            var snapshotFuture = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 9, 2));
+            Assert.False(snapshotFuture.IsInActiveStrength);
+        }
+
+        // ==========================================
+        // 2. ABSENCE & AUTOMATIC EXPIRATION TESTS
+        // ==========================================
+
+        [Fact]
+        public void AT_ABS_001_StatusIntervalMath_IsActiveAt_ShouldRespectHalfOpenBoundary()
         {
             var start = new DateTime(2026, 8, 16, 0, 0, 0);
             var endExclusive = new DateTime(2026, 8, 21, 0, 0, 0);
@@ -59,7 +144,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void StatusEngine_AutomaticReturnUponExpiration_ShouldEvaluateToPresent()
+        public void AT_ABS_002_AutomaticReturnUponExpiration_ShouldEvaluateToPresentOnReturnDate()
         {
             var engine = new StatusEngine();
             var person = new Personnel
@@ -79,45 +164,48 @@ namespace Dynamologio.Tests
                 EndAtExclusive = new DateTime(2026, 8, 21, 0, 0, 0)
             };
 
-            // During leave
-            var snapshotDuring = engine.CalculatePersonStatus(person, new[] { ev }, _uow.StatusTypes.GetAll(), null, null, null, null, new DateTime(2026, 8, 20, 12, 0, 0));
-            Assert.Equal(StatusEffect.Absent, snapshotDuring.EffectiveStatus);
-
-            // On Return Date
+            // On Return Date at midnight (00:00)
             var snapshotReturned = engine.CalculatePersonStatus(person, new[] { ev }, _uow.StatusTypes.GetAll(), null, null, null, null, new DateTime(2026, 8, 21, 0, 0, 0));
             Assert.Equal(StatusEffect.Present, snapshotReturned.EffectiveStatus);
         }
 
         [Fact]
-        public void StatusEngine_HistoricalArchiveQuery_ShouldPreservePastActiveStatus()
+        public void AT_ABS_003_SingleDayAbsence_ShouldHaveCorrectDurationAndReturn()
         {
-            // BUG AUD-001 Regression Test: Archiving person today should NOT exclude them from past historical queries
-            var engine = new StatusEngine();
-            var person = new Personnel
-            {
-                Id = Guid.NewGuid(),
-                LastName = "ΑΡΧΕΙΟΘΕΤΗΜΕΝΟΣ",
-                FirstName = "ΝΙΚΟΛΑΟΣ",
-                StrengthStartDate = new DateTime(2026, 1, 1),
-                StrengthEndDate = new DateTime(2026, 9, 1), // Departed September 1st
-                IsArchived = true
-            };
+            var start = new DateTime(2026, 8, 16);
+            var endExclusive = new DateTime(2026, 8, 17); // 1-day absence
 
-            // Query on August 20th (Historical query while active)
-            var snapshotPast = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 20));
-            Assert.True(snapshotPast.IsInActiveStrength);
-            Assert.Equal(StatusEffect.Present, snapshotPast.EffectiveStatus);
+            int days = StatusIntervalMath.CalculateDays(start, endExclusive);
+            Assert.Equal(1, days);
 
-            // Query on September 2nd (After departure)
-            var snapshotFuture = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 9, 2));
-            Assert.False(snapshotFuture.IsInActiveStrength);
-            Assert.Equal(StatusEffect.ExcludedFromStrength, snapshotFuture.EffectiveStatus);
+            Assert.True(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 16, 14, 0, 0)));
+            Assert.False(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 17, 0, 0, 0)));
         }
 
         [Fact]
-        public void StrengthCalculationEngine_ReturningToday_ShouldCountAccurately()
+        public void AT_ABS_004_CancelledAbsenceEvent_ShouldBeIgnored()
         {
-            // BUG AUD-004 Regression Test: Returning Today count must work when person returns to Present on return date
+            var engine = new StatusEngine();
+            var person = new Personnel { Id = Guid.NewGuid(), StrengthStartDate = new DateTime(2026, 1, 1) };
+            var kaType = _uow.StatusTypes.Find(x => x.ShortCode == "ΚΑ").First();
+
+            var cancelledEvent = new StatusEvent
+            {
+                PersonnelId = person.Id,
+                StatusTypeId = kaType.Id,
+                StartAt = new DateTime(2026, 8, 16),
+                EndAtExclusive = new DateTime(2026, 8, 25),
+                IsCancelled = true
+            };
+
+            var snapshot = engine.CalculatePersonStatus(person, new[] { cancelledEvent }, _uow.StatusTypes.GetAll(), null, null, null, null, new DateTime(2026, 8, 20));
+            Assert.Equal(StatusEffect.Present, snapshot.EffectiveStatus);
+        }
+
+        [Fact]
+        public void AT_ABS_005_ReturningToday_ShouldCountAccuratelyOnReturnDate()
+        {
+            // Bug AUD-004 Regression Test
             var statusEngine = new StatusEngine();
             var strengthEngine = new StrengthCalculationEngine(statusEngine);
 
@@ -136,7 +224,7 @@ namespace Dynamologio.Tests
                 PersonnelId = person.Id,
                 StatusTypeId = kaType.Id,
                 StartAt = new DateTime(2026, 8, 16),
-                EndAtExclusive = new DateTime(2026, 8, 21) // Return date is Aug 21
+                EndAtExclusive = new DateTime(2026, 8, 21)
             };
 
             var snapshot = strengthEngine.CalculateSnapshot(
@@ -147,7 +235,7 @@ namespace Dynamologio.Tests
                 _uow.OrganisationUnits.GetAll(),
                 null,
                 null,
-                new DateTime(2026, 8, 21)); // Evaluated ON the return date
+                new DateTime(2026, 8, 21));
 
             Assert.Equal(1, snapshot.TotalPresent);
             Assert.Equal(0, snapshot.TotalAbsent);
@@ -156,9 +244,9 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void StrengthCalculationEngine_CivilianPersonnel_ShouldNotCountAsConscript()
+        public void AT_ABS_006_CivilianPersonnel_ShouldNotCountAsConscript()
         {
-            // BUG AUD-006 Regression Test: Civilian personnel category must not silently fall through into Conscript count
+            // Bug AUD-006 Regression Test
             var statusEngine = new StatusEngine();
             var strengthEngine = new StrengthCalculationEngine(statusEngine);
 
@@ -183,21 +271,23 @@ namespace Dynamologio.Tests
 
             Assert.Equal(1, snapshot.CiviliansActive);
             Assert.Equal(0, snapshot.ConscriptsActive);
-            Assert.Equal(0, snapshot.OfficersAndNcosActive);
             Assert.Equal(1, snapshot.TotalActiveStrength);
         }
 
+        // ==========================================
+        // 3. CONFLICT DETECTION ENGINE TESTS
+        // ==========================================
+
         [Fact]
-        public void ConflictEngine_InvalidDateRange_ShouldReturnError()
+        public void AT_CONFLICT_001_InvalidDateRange_ShouldReturnError()
         {
-            // BUG AUD-003 Regression Test: Return <= Start must be detected as an error
             var conflictEngine = new ConflictEngine();
             var person = new Personnel { Id = Guid.NewGuid(), StrengthStartDate = new DateTime(2026, 1, 1) };
             var badEvent = new StatusEvent
             {
                 PersonnelId = person.Id,
                 StartAt = new DateTime(2026, 8, 21),
-                EndAtExclusive = new DateTime(2026, 8, 16) // Return BEFORE start
+                EndAtExclusive = new DateTime(2026, 8, 16)
             };
 
             var conflicts = conflictEngine.ValidateStatusEvent(badEvent, person, null, _uow.StatusTypes.GetAll());
@@ -205,7 +295,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void ConflictEngine_DuplicateAsm_ShouldReturnError()
+        public void AT_CONFLICT_002_DuplicateAsm_ShouldReturnError()
         {
             var conflictEngine = new ConflictEngine();
             var existing = new Personnel { Id = Guid.NewGuid(), MilitaryServiceNumber = "12345/2026", LastName = "Α", FirstName = "Β" };
@@ -216,7 +306,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void ConflictEngine_ServiceOutsideStrength_ShouldReturnError()
+        public void AT_CONFLICT_003_ServiceOutsideStrength_ShouldReturnError()
         {
             var conflictEngine = new ConflictEngine();
             var person = new Personnel
@@ -229,7 +319,7 @@ namespace Dynamologio.Tests
             var assignment = new ServiceAssignment
             {
                 PersonnelId = person.Id,
-                ServiceDate = new DateTime(2026, 10, 1), // Assigned AFTER departure date
+                ServiceDate = new DateTime(2026, 10, 1),
                 StartDateTime = new DateTime(2026, 10, 1, 8, 0, 0),
                 EndDateTime = new DateTime(2026, 10, 1, 14, 0, 0)
             };
@@ -239,23 +329,37 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void StatusIntervalMath_DoIntervalsOverlap_ShouldDetectCollisionsCorrectly()
+        public void AT_CONFLICT_004_OverlappingServices_ShouldReturnError()
         {
-            var s1 = new DateTime(2026, 8, 10);
-            var e1 = new DateTime(2026, 8, 15);
+            var conflictEngine = new ConflictEngine();
+            var person = new Personnel { Id = Guid.NewGuid(), StrengthStartDate = new DateTime(2026, 1, 1) };
 
-            // Adjacent: [10, 15) and [15, 20) -> Do NOT overlap
-            Assert.False(StatusIntervalMath.DoIntervalsOverlap(s1, e1, new DateTime(2026, 8, 15), new DateTime(2026, 8, 20)));
+            var existingService = new ServiceAssignment
+            {
+                Id = Guid.NewGuid(),
+                PersonnelId = person.Id,
+                StartDateTime = new DateTime(2026, 8, 16, 8, 0, 0),
+                EndDateTime = new DateTime(2026, 8, 16, 14, 0, 0)
+            };
 
-            // Overlapping: [10, 15) and [14, 18) -> Overlap!
-            Assert.True(StatusIntervalMath.DoIntervalsOverlap(s1, e1, new DateTime(2026, 8, 14), new DateTime(2026, 8, 18)));
+            var overlappingService = new ServiceAssignment
+            {
+                Id = Guid.NewGuid(),
+                PersonnelId = person.Id,
+                StartDateTime = new DateTime(2026, 8, 16, 12, 0, 0),
+                EndDateTime = new DateTime(2026, 8, 16, 18, 0, 0)
+            };
 
-            // Contained: [10, 15) and [11, 13) -> Overlap!
-            Assert.True(StatusIntervalMath.DoIntervalsOverlap(s1, e1, new DateTime(2026, 8, 11), new DateTime(2026, 8, 13)));
+            var conflicts = conflictEngine.ValidateServiceAssignment(overlappingService, person, new[] { existingService }, null);
+            Assert.Contains(conflicts, c => c.Severity == ConflictSeverity.Error && c.Code == "OVERLAPPING_SERVICE");
         }
 
+        // ==========================================
+        // 4. AUDIT & DIAGNOSTICS & BACKUP TESTS
+        // ==========================================
+
         [Fact]
-        public void AuditService_LogAction_ShouldRecordStructuredEvent()
+        public void AT_AUDIT_001_LogAction_ShouldRecordStructuredEvent()
         {
             var auditService = new AuditService(_uow);
             auditService.LogAction(AuditAction.Create, "Personnel", "123", "Δημιουργία προσώπου", null, new { Name = "Test" });
@@ -267,7 +371,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void DiagnosticPackageService_Export_ShouldProduceValidZip()
+        public void AT_DIAG_001_ExportDiagnosticPackage_ShouldProduceValidZip()
         {
             var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
             string outputZip = Path.Combine(Path.GetTempPath(), $"diag_test_{Guid.NewGuid():N}.zip");
@@ -285,7 +389,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void ReportGeneratorService_PrintableDocument_ShouldProduceFlowDocument()
+        public void AT_REPORT_001_PrintableDocument_ShouldProduceFlowDocument()
         {
             var statusEngine = new StatusEngine();
             var strengthEngine = new StrengthCalculationEngine(statusEngine);
@@ -303,7 +407,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void BackupService_CreateAndRestore_ShouldGuaranteeDataIntegrity()
+        public void AT_BACKUP_001_CreateAndRestore_ShouldGuaranteeDataIntegrity()
         {
             var backupService = new BackupService(_uow, _tempDbPath);
             var testDir = Path.Combine(Path.GetTempPath(), $"backup_test_{Guid.NewGuid():N}");

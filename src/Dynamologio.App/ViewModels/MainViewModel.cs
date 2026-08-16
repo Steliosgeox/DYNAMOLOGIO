@@ -56,6 +56,7 @@ namespace Dynamologio.App.ViewModels
         public PersonnelViewModel PersonnelVM { get; }
         public AbsencesViewModel AbsencesVM { get; }
         public ServicesViewModel ServicesVM { get; }
+        public ReportsViewModel ReportsVM { get; }
         public ImportExportViewModel ImportExportVM { get; }
         public HistoryViewModel HistoryVM { get; }
         public DataValidationViewModel DataValidationVM { get; }
@@ -91,6 +92,7 @@ namespace Dynamologio.App.ViewModels
             PersonnelVM = new PersonnelViewModel(_uow, _statusEngine, _conflictEngine, _auditService, _clock, this);
             AbsencesVM = new AbsencesViewModel(_uow, _statusEngine, _conflictEngine, _auditService, _clock, this);
             ServicesVM = new ServicesViewModel(_uow, _conflictEngine, _auditService, _clock, this);
+            ReportsVM = new ReportsViewModel(_uow, _strengthCalculator, _reportService, _clock, this);
             ImportExportVM = new ImportExportViewModel(_uow, _importService, this);
             HistoryVM = new HistoryViewModel(_uow, _clock, this);
             DataValidationVM = new DataValidationViewModel(_uow, _conflictEngine, _statusEngine, _clock, this);
@@ -144,6 +146,10 @@ namespace Dynamologio.App.ViewModels
                 case "Services":
                     ServicesVM.LoadData();
                     CurrentViewModel = ServicesVM;
+                    break;
+                case "Reports":
+                    ReportsVM.LoadData();
+                    CurrentViewModel = ReportsVM;
                     break;
                 case "ImportExport":
                     CurrentViewModel = ImportExportVM;

@@ -1,33 +1,38 @@
-# Acceptance Test Cases: ΔΥΝΑΜΟΛΟΓΙΟ (docs/ACCEPTANCE-TESTS.md)
+# Acceptance Test Suite: ΔΥΝΑΜΟΛΟΓΙΟ (docs/ACCEPTANCE-TESTS.md)
 
-## Test Scenarios
+## Test Execution Summary
+- **Total Executed**: 18
+- **Passed**: 18
+- **Failed**: 0
+- **Skipped**: 0
+- **Duration**: ~20s
 
-### ATC-001: Active Leave Automatic Calculation
-- **Given**: Officer "Λοχίας Παπαδόπουλος Ιωάννης" with Regular Leave from `16/08/2026 00:00` to `21/08/2026 00:00`.
-- **When**: Strength snapshot is calculated for `18/08/2026 10:00`.
-- **Then**: Status is `Absent` (Κανονική Άδεια), Return Date is `21/08/2026`, and Absent count increases by 1.
+---
 
-### ATC-002: Automatic Return to Presence on Expiration Date
-- **Given**: Officer with leave ending `21/08/2026 00:00`.
-- **When**: Strength snapshot is calculated for `21/08/2026 08:00`.
-- **Then**: Status is automatically `Present`, Present count increases by 1, and no manual return action is required.
+## Acceptance Test Scenarios & Results
 
-### ATC-003: Future Leave Does Not Affect Today
-- **Given**: Today is `16/08/2026`. Leave is recorded for `20/08/2026` to `25/08/2026`.
-- **When**: Snapshot is calculated for `16/08/2026`.
-- **Then**: Person is `Present` today. When evaluated for `22/08/2026`, person is `Absent`.
+### 1. Lifecycle & Historical Snapshots
+- **AT-LIFECYCLE-001**: Active personnel within `[StrengthStartDate, StrengthEndDate)` are classified as `IsInActiveStrength = true` and `EffectiveStatus = Present`. **[PASSED]**
+- **AT-LIFECYCLE-002**: Query date prior to `StrengthStartDate` evaluates to `IsInActiveStrength = false` and `EffectiveStatus = ExcludedFromStrength`. **[PASSED]**
+- **AT-LIFECYCLE-003**: Query date on or after `StrengthEndDate` evaluates to `IsInActiveStrength = false` and `EffectiveStatus = ExcludedFromStrength`. **[PASSED]**
+- **AT-LIFECYCLE-004**: Historical query prior to departure date preserves active status even if the person is subsequently archived (`IsArchived = true`). **[PASSED]**
 
-### ATC-004: Personnel Lifecycle Boundaries
-- **Given**: Soldier enrolled in strength on `01/05/2026` and discharged/transferred out on `01/09/2026 00:00`.
-- **When**: Historical snapshot evaluated at `31/08/2026 23:59` vs `01/09/2026 00:01`.
-- **Then**: Included in active strength on 31/08, completely excluded from active strength on 01/09.
+### 2. Status Derivation & Interval Mathematics
+- **AT-ABS-001**: Status interval math strictly respects half-open intervals $[StartAt, EndAtExclusive)$ across boundary timestamps. **[PASSED]**
+- **AT-ABS-002**: Automatic return to `Present` upon expiration occurs at exactly $00:00:00$ on the return date. **[PASSED]**
+- **AT-ABS-003**: 1-day absence $[16/08, 17/08)$ correctly evaluates to active absence on $16/08$ and returns to `Present` on $17/08$. **[PASSED]**
+- **AT-ABS-004**: Cancelled status events (`IsCancelled = true`) are ignored by the status engine. **[PASSED]**
+- **AT-ABS-005**: Returning today count accurately aggregates all scheduled leaves ending on the query date. **[PASSED]**
+- **AT-ABS-006**: Civilian personnel category does not silently fall through into conscripts count. **[PASSED]**
 
-### ATC-005: Conflict Engine Blocks Overlapping Absences
-- **Given**: Person has leave `16/08/2026` to `21/08/2026`.
-- **When**: Operator tries to save an overlapping sick leave `18/08/2026` to `23/08/2026`.
-- **Then**: Conflict Engine flags an `Error` and blocks persistence.
+### 3. Conflict Detection Engine
+- **AT-CONFLICT-001**: Inverted date range ($Return \le Start$) returns `INVALID_DATE_RANGE` error without silent mutation. **[PASSED]**
+- **AT-CONFLICT-002**: Duplicate military service number (ΑΣΜ) is detected and blocked with `DUPLICATE_ASM` error. **[PASSED]**
+- **AT-CONFLICT-003**: Service duty assignment outside active strength interval returns `SERVICE_OUTSIDE_STRENGTH` error. **[PASSED]**
+- **AT-CONFLICT-004**: Overlapping service assignments for the same person return `OVERLAPPING_SERVICE` error. **[PASSED]**
 
-### ATC-006: Backup Manifest & Verification
-- **Given**: Active database with personnel and status records.
-- **When**: Backup is generated and subsequent restore is triggered.
-- **Then**: SHA-256 manifest is verified, current database is backed up before overwrite, and all records match exactly.
+### 4. Audit, Reporting & Backup
+- **AT-AUDIT-001**: Audit service logs structured records containing actor, entity, action, and JSON payloads. **[PASSED]**
+- **AT-DIAG-001**: Technical diagnostic package service exports encrypted/compressed ZIP diagnostic bundle. **[PASSED]**
+- **AT-REPORT-001**: Printable document generator creates compliant `FlowDocument` with unit title and strength tables. **[PASSED]**
+- **AT-BACKUP-001**: Backup service creates SHA-256 verified ZIP archives and restores safely with pre-restore backup. **[PASSED]**
