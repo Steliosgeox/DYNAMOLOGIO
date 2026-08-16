@@ -1,0 +1,93 @@
+<UserControl x:Class="Dynamologio.App.Views.ImportExportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" 
+             d:DesignHeight="650" d:DesignWidth="950">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Step 1: File Selection -->
+        <Border Grid.Row="0" Style="{StaticResource CardContainer}" Margin="0,0,0,16" Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="📂 Επιλογή Αρχείου Excel Προσωπικού (.xlsx / .xls)" FontWeight="Bold" FontSize="14" Foreground="#1E293B" Margin="0,0,0,4" />
+                    <TextBlock Text="Επιλέξτε ένα αρχείο Excel για αυτόματη ανάλυση, αντιστοίχιση βαθμών/στηλών και προεπισκόπηση μεταβολών." Foreground="#64748B" FontSize="12" />
+                    <TextBlock Text="{Binding SelectedFilePath}" FontWeight="SemiBold" Foreground="#2563EB" Margin="0,6,0,0" />
+                </StackPanel>
+
+                <Button Grid.Column="1" Content="Αναζήτηση Αρχείου..." Style="{StaticResource PrimaryButton}" Command="{Binding SelectFileCommand}" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Step 2: Import Summary Counters -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardContainer}" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="ΣΥΝΟΛΟ ΕΓΓΡΑΦΩΝ" Foreground="#64748B" FontWeight="Bold" FontSize="11" />
+                    <TextBlock Text="{Binding PreviewReport.TotalRows}" FontSize="24" FontWeight="Bold" Foreground="#1E293B" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource CardContainer}" Margin="4,0,4,0" BorderBrush="#059669">
+                <StackPanel>
+                    <TextBlock Text="ΝΕΕΣ ΕΓΓΡΑΦΕΣ" Foreground="#059669" FontWeight="Bold" FontSize="11" />
+                    <TextBlock Text="{Binding PreviewReport.NewCount}" FontSize="24" FontWeight="Bold" Foreground="#059669" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardContainer}" Margin="4,0,4,0" BorderBrush="#2563EB">
+                <StackPanel>
+                    <TextBlock Text="ΕΝΗΜΕΡΩΣΕΙΣ" Foreground="#2563EB" FontWeight="Bold" FontSize="11" />
+                    <TextBlock Text="{Binding PreviewReport.UpdateCount}" FontSize="24" FontWeight="Bold" Foreground="#2563EB" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="3" Style="{StaticResource CardContainer}" Margin="8,0,0,0" BorderBrush="#D97706">
+                <StackPanel>
+                    <TextBlock Text="ΠΡΟΕΙΔΟΠΟΙΗΣΕΙΣ" Foreground="#D97706" FontWeight="Bold" FontSize="11" />
+                    <TextBlock Text="{Binding PreviewReport.WarningCount}" FontSize="24" FontWeight="Bold" Foreground="#D97706" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Step 3: Detailed Preview Grid -->
+        <Border Grid.Row="2" Style="{StaticResource CardContainer}" Margin="0,0,0,16">
+            <DataGrid ItemsSource="{Binding PreviewReport.Rows}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Γραμμή" Binding="{Binding RowIndex}" Width="70" />
+                    <DataGridTextColumn Header="Ενέργεια" Binding="{Binding Action}" Width="120" />
+                    <DataGridTextColumn Header="ΑΣΜ" Binding="{Binding MilitaryServiceNumber}" Width="100" />
+                    <DataGridTextColumn Header="Βαθμός" Binding="{Binding ResolvedRank.ShortName}" Width="100" />
+                    <DataGridTextColumn Header="Επώνυμο" Binding="{Binding LastName}" Width="150" />
+                    <DataGridTextColumn Header="Όνομα" Binding="{Binding FirstName}" Width="130" />
+                    <DataGridTextColumn Header="Μονάδα / Λόχος" Binding="{Binding ResolvedUnit.Name}" Width="140" />
+                    <DataGridTextColumn Header="Ειδικότητα" Binding="{Binding Specialty}" Width="120" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Step 4: Commit Button -->
+        <Border Grid.Row="3" HorizontalAlignment="Right">
+            <Button Content="🚀 Επιβεβαίωση &amp; Εκτέλεση Εισαγωγής στη Βάση" Style="{StaticResource SuccessButton}" Command="{Binding CommitImportCommand}" Height="38" Padding="20,8" />
+        </Border>
+    </Grid>
+</UserControl>

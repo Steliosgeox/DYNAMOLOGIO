@@ -1,0 +1,57 @@
+<UserControl x:Class="Dynamologio.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" 
+             d:DesignHeight="650" d:DesignWidth="950">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Action Cards: Backup, Restore, Diagnostics -->
+        <Border Grid.Row="0" Style="{StaticResource CardContainer}" Margin="0,0,0,16" Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="🛡️ Ασφάλεια, Αντίγραφα &amp; Διαγνωστικά" FontWeight="Bold" FontSize="14" Foreground="#1E293B" />
+                    <TextBlock Text="Δημιουργία και επαναφορά ασφαλών αντιγράφων με έλεγχο SHA-256 και εξαγωγή τεχνικού πακέτου." Foreground="#64748B" FontSize="12" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <Button Grid.Column="1" Content="💾 Δημιουργία Αντιγράφου" Style="{StaticResource PrimaryButton}" Command="{Binding CreateBackupCommand}" Margin="0,0,8,0" />
+                <Button Grid.Column="2" Content="🔄 Επαναφορά από Αντίγραφο" Style="{StaticResource DangerButton}" Command="{Binding RestoreBackupCommand}" Margin="0,0,8,0" />
+                <Button Grid.Column="3" Content="📦 Εξαγωγή Τεχνικού Πακέτου" Style="{StaticResource SecondaryButton}" Command="{Binding ExportDiagnosticsCommand}" />
+            </Grid>
+        </Border>
+
+        <!-- Audit Trail Table -->
+        <Border Grid.Row="1" Style="{StaticResource CardContainer}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="📜 Ιστορικό Ενεργειών &amp; Μεταβολών (Audit Trail)" FontWeight="Bold" FontSize="14" Foreground="#1E293B" Margin="0,0,0,12" />
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding RecentAudits}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Ημερομηνία &amp; Ώρα" Binding="{Binding CreatedAt, StringFormat=\{0:dd/MM/yyyy HH:mm:ss\}}" Width="150" />
+                        <DataGridTextColumn Header="Χρήστης" Binding="{Binding Username}" Width="110" />
+                        <DataGridTextColumn Header="Ενέργεια" Binding="{Binding Action}" Width="100" />
+                        <DataGridTextColumn Header="Οντότητα" Binding="{Binding EntityType}" Width="130" />
+                        <DataGridTextColumn Header="Περιγραφή Μεταβολής" Binding="{Binding Summary}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

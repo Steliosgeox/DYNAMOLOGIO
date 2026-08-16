@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Dynamologio.Reporting</RootNamespace>
+    <AssemblyName>Dynamologio.Reporting</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dynamologio.Core\Dynamologio.Core.csproj" />
+    <ProjectReference Include="..\Dynamologio.ImportExport\Dynamologio.ImportExport.csproj" />
+  </ItemGroup>
+</Project>

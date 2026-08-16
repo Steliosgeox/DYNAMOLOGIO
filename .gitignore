@@ -1,0 +1,30 @@
+## Build & Output Folders
+bin/
+obj/
+TestResults/
+installer_output/
+packages/
+
+## Visual Studio & IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Local Data & Private DB files
+*.db
+*.db-shm
+*.db-wal
+*.bak
+*.log
+%PROGRAMDATA%/
+
+## OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

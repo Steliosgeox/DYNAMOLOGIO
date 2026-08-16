@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Dynamologio.App</RootNamespace>
+    <AssemblyName>Dynamologio</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dynamologio.Core\Dynamologio.Core.csproj" />
+    <ProjectReference Include="..\Dynamologio.Infrastructure\Dynamologio.Infrastructure.csproj" />
+    <ProjectReference Include="..\Dynamologio.ImportExport\Dynamologio.ImportExport.csproj" />
+    <ProjectReference Include="..\Dynamologio.Reporting\Dynamologio.Reporting.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,62 @@
+<UserControl x:Class="Dynamologio.App.Views.ServicesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" 
+             d:DesignHeight="650" d:DesignWidth="950">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left Column: Assign Service -->
+        <Border Grid.Column="0" Style="{StaticResource CardContainer}" Margin="0,0,16,0">
+            <StackPanel>
+                <TextBlock Text="🛡️ Ανάθεση Καθήκοντος / Υπηρεσίας" FontWeight="Bold" FontSize="14" Foreground="#1E293B" Margin="0,0,0,16" />
+
+                <!-- Person -->
+                <TextBlock Text="Στέλεχος / Οπλίτης:" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <ComboBox ItemsSource="{Binding PersonnelList}" SelectedItem="{Binding SelectedPerson}" DisplayMemberPath="FullName" Margin="0,0,0,12" />
+
+                <!-- Service Type -->
+                <TextBlock Text="Είδος Υπηρεσίας:" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <ComboBox ItemsSource="{Binding ServiceTypesList}" SelectedItem="{Binding SelectedServiceType}" DisplayMemberPath="Name" Margin="0,0,0,12" />
+
+                <!-- Service Date -->
+                <TextBlock Text="Ημερομηνία Υπηρεσίας:" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <DatePicker SelectedDate="{Binding ServiceDate}" Margin="0,0,0,12" />
+
+                <!-- Location -->
+                <TextBlock Text="Τοποθεσία / Φυλάκιο:" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <TextBox Text="{Binding DutyLocation, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,16" />
+
+                <!-- Button -->
+                <Button Content="✅ Ανάθεση Υπηρεσίας" Style="{StaticResource PrimaryButton}" Command="{Binding AssignServiceCommand}" Height="36" />
+            </StackPanel>
+        </Border>
+
+        <!-- Right Column: Today's Assignments -->
+        <Border Grid.Column="1" Style="{StaticResource CardContainer}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="📅 Πρόγραμμα Υπηρεσιών Ημέρας" FontWeight="Bold" FontSize="14" Foreground="#1E293B" Margin="0,0,0,12" />
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding TodayAssignments}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Ημερομηνία" Binding="{Binding ServiceDate, StringFormat=\{0:dd/MM/yyyy\}}" Width="100" />
+                        <DataGridTextColumn Header="Έναρξη" Binding="{Binding StartDateTime, StringFormat=\{0:HH:mm\}}" Width="90" />
+                        <DataGridTextColumn Header="Λήξη" Binding="{Binding EndDateTime, StringFormat=\{0:HH:mm\}}" Width="90" />
+                        <DataGridTextColumn Header="Τοποθεσία" Binding="{Binding DutyLocation}" Width="160" />
+                        <DataGridTextColumn Header="Παρατηρήσεις" Binding="{Binding Notes}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

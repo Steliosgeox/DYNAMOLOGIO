@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>10.0</LangVersion>
+    <Deterministic>true</Deterministic>
+    <Company>Dynamologio</Company>
+    <Product>ΔΥΝΑΜΟΛΟΓΙΟ</Product>
+    <Copyright>Copyright © 2026</Copyright>
+    <Version>1.0.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+  </PropertyGroup>
+</Project>

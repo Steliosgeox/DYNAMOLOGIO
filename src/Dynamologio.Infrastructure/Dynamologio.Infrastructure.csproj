@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>Dynamologio.Infrastructure</RootNamespace>
+    <AssemblyName>Dynamologio.Infrastructure</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dynamologio.Core\Dynamologio.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="LiteDB" Version="5.0.17" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

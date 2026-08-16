@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>Dynamologio.ImportExport</RootNamespace>
+    <AssemblyName>Dynamologio.ImportExport</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dynamologio.Core\Dynamologio.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NPOI" Version="2.6.2" />
+  </ItemGroup>
+</Project>
