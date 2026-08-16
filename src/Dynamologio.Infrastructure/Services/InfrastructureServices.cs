@@ -27,27 +27,20 @@ namespace Dynamologio.Infrastructure.Services
 
         public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = "OPERATOR")
         {
-            try
+            var audit = new AuditEvent
             {
-                var audit = new AuditEvent
-                {
-                    Username = username,
-                    Action = action,
-                    EntityType = entityType,
-                    EntityId = entityId,
-                    Summary = summary,
-                    OldValueJson = oldValue != null ? JsonConvert.SerializeObject(oldValue) : string.Empty,
-                    NewValueJson = newValue != null ? JsonConvert.SerializeObject(newValue) : string.Empty,
-                    ImportBatchId = importBatchId,
-                    AppVersion = "1.0.0.0"
-                };
+                Username = string.IsNullOrWhiteSpace(username) ? "OPERATOR" : username,
+                Action = action,
+                EntityType = entityType ?? string.Empty,
+                EntityId = entityId ?? string.Empty,
+                Summary = summary ?? string.Empty,
+                OldValueJson = oldValue != null ? JsonConvert.SerializeObject(oldValue) : string.Empty,
+                NewValueJson = newValue != null ? JsonConvert.SerializeObject(newValue) : string.Empty,
+                ImportBatchId = importBatchId,
+                AppVersion = "1.0.0.0"
+            };
 
-                _uow.AuditEvents.Insert(audit);
-            }
-            catch
-            {
-                // Fallback: Do not crash business operations if audit logging fails
-            }
+            _uow.AuditEvents.Insert(audit);
         }
     }
 
@@ -55,7 +48,7 @@ namespace Dynamologio.Infrastructure.Services
     {
         public string AppVersion { get; set; } = "1.0.0.0";
         public int SchemaVersion { get; set; } = 1;
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
         public string DatabaseFileName { get; set; } = "dynamologio.db";
         public string DatabaseSha256 { get; set; } = string.Empty;
         public int PersonnelCount { get; set; }
@@ -64,9 +57,9 @@ namespace Dynamologio.Infrastructure.Services
 
     public interface IBackupService
     {
-        string CreateBackup(string targetDirectory = null);
+        BackupManifest CreateBackup(string targetDirectory = null);
         bool VerifyBackup(string backupZipPath, out BackupManifest manifest, out string errorMessage);
-        bool RestoreBackup(string backupZipPath, out string errorMessage);
+        void RestoreBackup(string backupZipPath);
         void PerformDailyAutoBackup();
     }
 
@@ -75,13 +68,13 @@ namespace Dynamologio.Infrastructure.Services
         private readonly string _dbFilePath;
         private readonly IUnitOfWork _uow;
 
-        public BackupService(string dbFilePath, IUnitOfWork uow)
+        public BackupService(IUnitOfWork uow, string dbFilePath)
         {
-            _dbFilePath = dbFilePath;
             _uow = uow;
+            _dbFilePath = dbFilePath;
         }
 
-        public string CreateBackup(string targetDirectory = null)
+        public BackupManifest CreateBackup(string targetDirectory = null)
         {
             if (!File.Exists(_dbFilePath))
             {
@@ -105,7 +98,7 @@ namespace Dynamologio.Infrastructure.Services
             string sha256 = ComputeSha256(_dbFilePath);
             var manifest = new BackupManifest
             {
-                CreatedAt = DateTime.Now,
+                Timestamp = DateTime.Now,
                 DatabaseSha256 = sha256,
                 PersonnelCount = _uow.Personnel.Count(),
                 StatusEventsCount = _uow.StatusEvents.Count()
@@ -114,10 +107,8 @@ namespace Dynamologio.Infrastructure.Services
             using (var zipStream = new FileStream(backupZipPath, FileMode.Create))
             using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
             {
-                // Add DB
                 archive.CreateEntryFromFile(_dbFilePath, "dynamologio.db", CompressionLevel.Optimal);
 
-                // Add Manifest
                 var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
                 using (var entryStream = manifestEntry.Open())
                 using (var writer = new StreamWriter(entryStream, Encoding.UTF8))
@@ -126,7 +117,7 @@ namespace Dynamologio.Infrastructure.Services
                 }
             }
 
-            return backupZipPath;
+            return manifest;
         }
 
         public bool VerifyBackup(string backupZipPath, out BackupManifest manifest, out string errorMessage)
@@ -159,7 +150,6 @@ namespace Dynamologio.Infrastructure.Services
                         manifest = JsonConvert.DeserializeObject<BackupManifest>(json);
                     }
 
-                    // Extract DB to temp and verify checksum
                     string tempDb = Path.Combine(Path.GetTempPath(), $"verify_{Guid.NewGuid():N}.db");
                     try
                     {
@@ -187,35 +177,25 @@ namespace Dynamologio.Infrastructure.Services
             }
         }
 
-        public bool RestoreBackup(string backupZipPath, out string errorMessage)
+        public void RestoreBackup(string backupZipPath)
         {
-            if (!VerifyBackup(backupZipPath, out var manifest, out errorMessage))
+            if (!VerifyBackup(backupZipPath, out var manifest, out var errorMessage))
             {
-                return false;
+                throw new InvalidOperationException($"Αποτυχία επαλήθευσης αντιγράφου: {errorMessage}");
             }
 
-            try
+            // 1. Pre-restore safety backup
+            if (File.Exists(_dbFilePath))
             {
-                // 1. Create Pre-Restore safety backup of current live DB
-                if (File.Exists(_dbFilePath))
-                {
-                    string safetyBackup = Path.Combine(Path.GetDirectoryName(_dbFilePath), $"pre_restore_safety_{DateTime.Now:yyyyMMdd_HHmmss}.bak");
-                    File.Copy(_dbFilePath, safetyBackup, true);
-                }
-
-                // 2. Extract restored DB
-                using (var archive = ZipFile.OpenRead(backupZipPath))
-                {
-                    var dbEntry = archive.GetEntry("dynamologio.db");
-                    dbEntry.ExtractToFile(_dbFilePath, true);
-                }
-
-                return true;
+                string safetyBackup = Path.Combine(Path.GetDirectoryName(_dbFilePath), $"pre_restore_safety_{DateTime.Now:yyyyMMdd_HHmmss}.bak");
+                File.Copy(_dbFilePath, safetyBackup, true);
             }
-            catch (Exception ex)
+
+            // 2. Extract restored DB
+            using (var archive = ZipFile.OpenRead(backupZipPath))
             {
-                errorMessage = $"Σφάλμα κατά την επαναφορά: {ex.Message}";
-                return false;
+                var dbEntry = archive.GetEntry("dynamologio.db");
+                dbEntry.ExtractToFile(_dbFilePath, true);
             }
         }
 
@@ -226,7 +206,6 @@ namespace Dynamologio.Infrastructure.Services
                 string backupsDir = Path.Combine(Path.GetDirectoryName(_dbFilePath), "Backups");
                 if (!Directory.Exists(backupsDir)) Directory.CreateDirectory(backupsDir);
 
-                // Check if backup already exists for today
                 string todayPrefix = $"Dynamologio_Backup_{DateTime.Now:yyyyMMdd}";
                 var files = Directory.GetFiles(backupsDir, $"{todayPrefix}*.zip");
                 if (files.Length == 0)
@@ -234,7 +213,6 @@ namespace Dynamologio.Infrastructure.Services
                     CreateBackup(backupsDir);
                 }
 
-                // Rotate: Keep latest 7 backups
                 var allBackups = new DirectoryInfo(backupsDir).GetFiles("Dynamologio_Backup_*.zip");
                 if (allBackups.Length > 7)
                 {
@@ -264,16 +242,29 @@ namespace Dynamologio.Infrastructure.Services
         }
     }
 
-    public class DiagnosticPackageService
+    public interface IDiagnosticPackageService
     {
-        public static string GenerateDiagnosticPackage(IUnitOfWork uow, string dbPath, string outputDir = null)
-        {
-            if (string.IsNullOrWhiteSpace(outputDir))
-            {
-                outputDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-            }
+        string ExportDiagnosticPackage(string outputZipPath = null);
+    }
 
-            string zipPath = Path.Combine(outputDir, $"Dynamologio_Diagnostics_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
+    public class DiagnosticPackageService : IDiagnosticPackageService
+    {
+        private readonly IUnitOfWork _uow;
+        private readonly string _dbPath;
+
+        public DiagnosticPackageService(IUnitOfWork uow, string dbPath)
+        {
+            _uow = uow;
+            _dbPath = dbPath;
+        }
+
+        public string ExportDiagnosticPackage(string outputZipPath = null)
+        {
+            if (string.IsNullOrWhiteSpace(outputZipPath))
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                outputZipPath = Path.Combine(desktop, $"Dynamologio_Diagnostics_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
+            }
 
             var diagnosticInfo = new
             {
@@ -284,14 +275,14 @@ namespace Dynamologio.Infrastructure.Services
                 CLRVersion = Environment.Version.ToString(),
                 MachineName = Environment.MachineName,
                 ProcessorCount = Environment.ProcessorCount,
-                TotalPersonnelCount = uow.Personnel.Count(),
-                ActivePersonnelCount = uow.Personnel.Find(p => !p.IsArchived).Count(),
-                StatusEventsCount = uow.StatusEvents.Count(),
-                AuditEventsCount = uow.AuditEvents.Count(),
-                DatabaseSize = File.Exists(dbPath) ? new FileInfo(dbPath).Length : 0
+                TotalPersonnelCount = _uow.Personnel.Count(),
+                ActivePersonnelCount = _uow.Personnel.Find(p => !p.IsArchived).Count(),
+                StatusEventsCount = _uow.StatusEvents.Count(),
+                AuditEventsCount = _uow.AuditEvents.Count(),
+                DatabaseSize = File.Exists(_dbPath) ? new FileInfo(_dbPath).Length : 0
             };
 
-            using (var zipStream = new FileStream(zipPath, FileMode.Create))
+            using (var zipStream = new FileStream(outputZipPath, FileMode.Create))
             using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
             {
                 var infoEntry = archive.CreateEntry("system_diagnostics.json", CompressionLevel.Optimal);
@@ -301,7 +292,7 @@ namespace Dynamologio.Infrastructure.Services
                 }
             }
 
-            return zipPath;
+            return outputZipPath;
         }
     }
 }

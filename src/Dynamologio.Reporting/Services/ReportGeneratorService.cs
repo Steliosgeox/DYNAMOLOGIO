@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
@@ -82,14 +84,23 @@ namespace Dynamologio.Reporting.Services
             string templatePath = request.CustomTemplatePath;
             if (string.IsNullOrWhiteSpace(templatePath) || !File.Exists(templatePath))
             {
-                // Fallback to default reference template
+                // Check configured templates in program data or reference folder
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                 if (string.IsNullOrEmpty(appData)) appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 templatePath = Path.Combine(appData, "Dynamologio", "Templates", "Standard_Dynamologio_Template.xlsx");
 
                 if (!File.Exists(templatePath))
                 {
-                    GoldenTemplateGenerator.GenerateDefaultGoldenTemplate(templatePath);
+                    // Check local templates-reference directory
+                    string localRef = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "templates-reference", "Standard_Dynamologio_Template.xlsx");
+                    if (File.Exists(localRef))
+                    {
+                        templatePath = localRef;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Δεν έχει οριστεί επαληθευμένο πρότυπο Δυναμολογίου. Παρακαλώ εισάγετε το επίσημο αρχείο προτύπου στις Ρυθμίσεις.");
+                    }
                 }
             }
 

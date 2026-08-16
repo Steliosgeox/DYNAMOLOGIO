@@ -1,0 +1,113 @@
+<Window x:Class="Dynamologio.App.Views.PersonEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding DialogTitle}" Height="480" Width="520"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource CanvasBgBrush}"
+        FontFamily="Segoe UI">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Text="{Binding DialogTitle}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,16" />
+
+        <!-- Form Body -->
+        <Border Grid.Row="1" Style="{StaticResource CardContainer}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Επώνυμο *" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Όνομα *" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Πατρώνυμο" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding FatherName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="ΑΣΜ / Αρ. Μητρώου" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding MilitaryServiceNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Βαθμός *" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding RanksList}" SelectedItem="{Binding SelectedRank}" DisplayMemberPath="Name" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Μονάδα / Λόχος" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding UnitsList}" SelectedItem="{Binding SelectedUnit}" DisplayMemberPath="Name" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Ειδικότητα" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding Specialty, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Ημ/νία Ένταξης στη Δύναμη" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <DatePicker SelectedDate="{Binding StrengthStartDate}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Margin="0,0,0,6">
+                        <TextBlock Text="Παρατηρήσεις" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Height="45" TextWrapping="Wrap" AcceptsReturn="True" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Inline Error Banner -->
+        <TextBlock Grid.Row="2" Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,8" Visibility="{Binding ErrorMessage, Converter={x:Null}}" />
+
+        <!-- Dialog Buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Ακύρωση" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Width="90" Margin="0,0,8,0" />
+            <Button Content="Αποθήκευση" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" Width="110" />
+        </StackPanel>
+    </Grid>
+</Window>

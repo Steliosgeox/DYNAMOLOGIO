@@ -33,6 +33,7 @@ namespace Dynamologio.Core.Interfaces
         IRepository<ImportBatch> ImportBatches { get; }
         IRepository<AppSetting> AppSettings { get; }
 
+        void BeginTransaction();
         void Commit();
         void Rollback();
     }
@@ -75,5 +76,11 @@ namespace Dynamologio.Core.Interfaces
         List<ConflictResult> ValidatePersonnel(
             Personnel candidatePerson,
             IEnumerable<Personnel> existingPersonnel);
+
+        List<ConflictResult> ValidateServiceAssignment(
+            ServiceAssignment assignment,
+            Personnel person,
+            IEnumerable<ServiceAssignment> existingAssignmentsForPerson,
+            IEnumerable<StatusEvent> statusEventsForPerson);
     }
 }

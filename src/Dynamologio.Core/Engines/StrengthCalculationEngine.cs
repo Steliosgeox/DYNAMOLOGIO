@@ -39,11 +39,11 @@ namespace Dynamologio.Core.Engines
             var statusTypeDict = statusTypes?.ToDictionary(st => st.Id) ?? new Dictionary<Guid, StatusType>();
             var serviceTypeDict = serviceTypes?.ToDictionary(st => st.Id) ?? new Dictionary<Guid, ServiceType>();
 
-            var eventsByPerson = allStatusEvents?
-                .GroupBy(e => e.PersonnelId)
-                .ToDictionary(g => g.Key, g => g.ToList()) ?? new Dictionary<Guid, List<StatusEvent>>();
+            var eventsList = allStatusEvents?.Where(e => !e.IsCancelled).ToList() ?? new List<StatusEvent>();
+            var eventsByPerson = eventsList.GroupBy(e => e.PersonnelId).ToDictionary(g => g.Key, g => g.ToList());
 
             var servicesByPerson = serviceAssignments?
+                .Where(s => !s.IsCancelled)
                 .GroupBy(s => s.PersonnelId)
                 .ToDictionary(g => g.Key, g => g.ToList()) ?? new Dictionary<Guid, List<ServiceAssignment>>();
 
@@ -58,12 +58,27 @@ namespace Dynamologio.Core.Engines
                 candidatePersonnel = candidatePersonnel.Where(p => p.OrganisationUnitId == filterUnitId.Value);
             }
 
-            // Midnight boundaries for returning counts
             var todayDate = asOfTimestamp.Date;
             var tomorrowDate = todayDate.AddDays(1);
-            var dayAfterTomorrowDate = todayDate.AddDays(2);
 
-            foreach (var person in candidatePersonnel)
+            // 1. Calculate Returning Counts across ALL scheduled absence events for active personnel on this date
+            var candidateList = candidatePersonnel.ToList();
+            var candidateIds = new HashSet<Guid>(candidateList.Select(p => p.Id));
+
+            foreach (var ev in eventsList.Where(e => candidateIds.Contains(e.PersonnelId)))
+            {
+                if (ev.EndAtExclusive.Date == todayDate)
+                {
+                    snapshot.ReturningTodayCount++;
+                }
+                else if (ev.EndAtExclusive.Date == tomorrowDate)
+                {
+                    snapshot.ReturningTomorrowCount++;
+                }
+            }
+
+            // 2. Aggregate Personnel Status
+            foreach (var person in candidateList)
             {
                 rankDict.TryGetValue(person.RankId, out var rank);
                 unitDict.TryGetValue(person.OrganisationUnitId, out var unit);
@@ -90,15 +105,18 @@ namespace Dynamologio.Core.Engines
                 snapshot.TotalActiveStrength++;
                 snapshot.AllActivePersonnel.Add(pSnapshot);
 
-                bool isOfficerOrNco = person.Category == PersonnelCategory.OfficerOrNco;
-
-                if (isOfficerOrNco)
+                // Explicit Category handling (no silent fallthrough)
+                switch (person.Category)
                 {
-                    snapshot.OfficersAndNcosActive++;
-                }
-                else
-                {
-                    snapshot.ConscriptsActive++;
+                    case PersonnelCategory.OfficerOrNco:
+                        snapshot.OfficersAndNcosActive++;
+                        break;
+                    case PersonnelCategory.Conscript:
+                        snapshot.ConscriptsActive++;
+                        break;
+                    case PersonnelCategory.Civilian:
+                        snapshot.CiviliansActive++;
+                        break;
                 }
 
                 if (pSnapshot.EffectiveStatus == StatusEffect.Present)
@@ -106,13 +124,17 @@ namespace Dynamologio.Core.Engines
                     snapshot.TotalPresent++;
                     snapshot.PresentPersonnel.Add(pSnapshot);
 
-                    if (isOfficerOrNco)
+                    switch (person.Category)
                     {
-                        snapshot.OfficersAndNcosPresent++;
-                    }
-                    else
-                    {
-                        snapshot.ConscriptsPresent++;
+                        case PersonnelCategory.OfficerOrNco:
+                            snapshot.OfficersAndNcosPresent++;
+                            break;
+                        case PersonnelCategory.Conscript:
+                            snapshot.ConscriptsPresent++;
+                            break;
+                        case PersonnelCategory.Civilian:
+                            snapshot.CiviliansPresent++;
+                            break;
                     }
                 }
                 else if (pSnapshot.EffectiveStatus == StatusEffect.Absent)
@@ -120,13 +142,17 @@ namespace Dynamologio.Core.Engines
                     snapshot.TotalAbsent++;
                     snapshot.AbsentPersonnel.Add(pSnapshot);
 
-                    if (isOfficerOrNco)
+                    switch (person.Category)
                     {
-                        snapshot.OfficersAndNcosAbsent++;
-                    }
-                    else
-                    {
-                        snapshot.ConscriptsAbsent++;
+                        case PersonnelCategory.OfficerOrNco:
+                            snapshot.OfficersAndNcosAbsent++;
+                            break;
+                        case PersonnelCategory.Conscript:
+                            snapshot.ConscriptsAbsent++;
+                            break;
+                        case PersonnelCategory.Civilian:
+                            snapshot.CiviliansAbsent++;
+                            break;
                     }
 
                     // Reason counts
@@ -137,20 +163,6 @@ namespace Dynamologio.Core.Engines
 
                         snapshot.AbsencesByReasonCode[code] = snapshot.AbsencesByReasonCode.TryGetValue(code, out var cVal) ? cVal + 1 : 1;
                         snapshot.AbsencesByReasonName[name] = snapshot.AbsencesByReasonName.TryGetValue(name, out var nVal) ? nVal + 1 : 1;
-                    }
-
-                    // Returning today check (returns on today's date)
-                    if (pSnapshot.ExpectedReturnDate.HasValue)
-                    {
-                        var retDate = pSnapshot.ExpectedReturnDate.Value.Date;
-                        if (retDate == todayDate)
-                        {
-                            snapshot.ReturningTodayCount++;
-                        }
-                        else if (retDate == tomorrowDate)
-                        {
-                            snapshot.ReturningTomorrowCount++;
-                        }
                     }
                 }
             }

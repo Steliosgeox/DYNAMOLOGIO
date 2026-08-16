@@ -1,106 +1,173 @@
 <Window x:Class="Dynamologio.App.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Dynamologio.App.ViewModels"
         xmlns:views="clr-namespace:Dynamologio.App.Views"
-        xmlns:viewmodels="clr-namespace:Dynamologio.App.ViewModels"
-        mc:Ignorable="d"
-        Title="ΔΥΝΑΜΟΛΟΓΙΟ - Σύστημα Διαχείρισης Δυνάμεως Προσωπικού" 
-        Height="768" Width="1280" MinHeight="700" MinWidth="1024"
+        Title="ΔΥΝΑΜΟΛΟΓΙΟ — Σταθμός Διαχείρισης Δύναμης &amp; Μεταβολών Προσωπικού"
+        Height="800" Width="1240" MinHeight="680" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource CanvasBgBrush}">
+        Background="{StaticResource CanvasBgBrush}"
+        FontFamily="Segoe UI">
 
     <Window.Resources>
-        <DataTemplate DataType="{x:Type viewmodels:DashboardViewModel}">
+        <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
             <views:DashboardView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:DynamologioViewModel}">
+        <DataTemplate DataType="{x:Type vm:DynamologioViewModel}">
             <views:DynamologioView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:PersonnelViewModel}">
+        <DataTemplate DataType="{x:Type vm:PersonnelViewModel}">
             <views:PersonnelView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:AbsencesViewModel}">
+        <DataTemplate DataType="{x:Type vm:AbsencesViewModel}">
             <views:AbsencesView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:ServicesViewModel}">
+        <DataTemplate DataType="{x:Type vm:ServicesViewModel}">
             <views:ServicesView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:ImportExportViewModel}">
+        <DataTemplate DataType="{x:Type vm:ImportExportViewModel}">
             <views:ImportExportView />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:SettingsViewModel}">
+        <DataTemplate DataType="{x:Type vm:HistoryViewModel}">
+            <views:HistoryView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DataValidationViewModel}">
+            <views:DataValidationView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsView />
         </DataTemplate>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="56" />
+            <RowDefinition Height="52" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="28" />
+            <RowDefinition Height="26" />
         </Grid.RowDefinitions>
 
-        <!-- TOP BAR -->
-        <Border Grid.Row="0" Background="{StaticResource NavyDarkBrush}" Padding="20,0">
+        <!-- Top Header Chrome -->
+        <Border Grid.Row="0" Background="{StaticResource HeaderDarkBrush}" Padding="16,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
+                <!-- App Brand & Unit Info -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="🇬🇷" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <TextBlock Text="ΔΥΝΑΜΟΛΟΓΙΟ" FontWeight="Bold" FontSize="16" Foreground="White" VerticalAlignment="Center" />
-                    <TextBlock Text=" | 1ο ΓΡΑΦΕΙΟ" FontWeight="SemiBold" FontSize="13" Foreground="#94A3B8" VerticalAlignment="Center" Margin="6,0,0,0" />
+                    <!-- Vector Mark -->
+                    <Path Data="{StaticResource IconAppLogoGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="20" Height="20" Stretch="Uniform" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock Text="ΔΥΝΑΜΟΛΟΓΙΟ" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                    <TextBlock Text=" | " FontSize="14" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="4,0" />
+                    <TextBlock Text="{Binding UnitNameHeader}" FontSize="13" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                    <TextBlock Text=" · " FontSize="13" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="2,0" />
+                    <TextBlock Text="{Binding OfficeNameHeader}" FontSize="13" Foreground="#94A3B8" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <TextBlock Grid.Column="2" Text="{Binding CurrentDateDisplay}" Foreground="#94A3B8" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,20,0" />
-
-                <Button Grid.Column="3" Content="🔄 Ανανέωση" Style="{StaticResource PrimaryButton}" Command="{Binding RefreshAllCommand}" VerticalAlignment="Center" Padding="12,5" FontSize="12" />
+                <!-- Offline Operational Tag -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="3" Padding="8,3">
+                        <TextBlock Text="Τοπικός Σταθμός (Offline)" FontSize="11" Foreground="#94A3B8" />
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- MAIN WORKSPACE -->
+        <!-- Main Body: Navigation Sidebar + Content Area -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- SIDEBAR NAVIGATION -->
-            <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}">
-                <StackPanel Margin="0,10,0,0">
-                    <!-- Nav Buttons -->
-                    <Button Content="📊 Αρχική (Dashboard)" Command="{Binding NavigateCommand}" CommandParameter="Dashboard" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                    <Button Content="📋 Δυναμολόγιο" Command="{Binding NavigateCommand}" CommandParameter="Dynamologio" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                    <Button Content="👥 Προσωπικό" Command="{Binding NavigateCommand}" CommandParameter="Personnel" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                    <Button Content="📝 Απουσίες / Άδειες" Command="{Binding NavigateCommand}" CommandParameter="Absences" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                    <Button Content="🛡️ Υπηρεσίες" Command="{Binding NavigateCommand}" CommandParameter="Services" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                    <Button Content="📂 Εισαγωγή / Εξαγωγή" Command="{Binding NavigateCommand}" CommandParameter="ImportExport" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                    <Button Content="⚙️ Ρυθμίσεις &amp; Αντίγραφα" Command="{Binding NavigateCommand}" CommandParameter="Settings" Height="44" HorizontalContentAlignment="Left" Padding="16,0" Foreground="White" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" />
-                </StackPanel>
+            <!-- Navigation Sidebar (Dark Navy Rail) -->
+            <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,10,0,10">
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Αρχική" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Δυναμολόγιο" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Personnel">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Προσωπικό" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Absences">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Απουσίες &amp; Άδειες" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Services">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Υπηρεσίες" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Separator Background="#334155" Margin="14,10" Height="1" />
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Εισαγωγή Excel" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Έλεγχος Δεδομένων" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="History">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Ιστορικό (Audit)" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Settings">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <TextBlock Text="Ρυθμίσεις &amp; Backup" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
 
-            <!-- MAIN CONTENT AREA -->
-            <ContentControl Grid.Column="1" Content="{Binding CurrentView}" />
+            <!-- Dynamic Content Area -->
+            <ContentControl Grid.Column="1" Content="{Binding CurrentViewModel}" />
         </Grid>
 
-        <!-- STATUS BAR -->
-        <Border Grid.Row="2" Background="#E2E8F0" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="16,0">
-            <Grid>
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#E2E8F0" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="0,1,0,0" Padding="12,0">
+            <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" VerticalAlignment="Center" FontSize="11" Foreground="#475569" />
-                <TextBlock Grid.Column="1" Text="🔒 100% Εκτός Δικτύου (Air-Gapped)" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#059669" Margin="0,0,16,0" />
-                <TextBlock Grid.Column="2" Text="Έκδοση 1.0.0 (.NET 4.7.2)" VerticalAlignment="Center" FontSize="11" Foreground="#64748B" />
+                <TextBlock Grid.Column="0" Text="Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                <TextBlock Grid.Column="1" Text="ΔΥΝΑΜΟΛΟΓΙΟ v1.0.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
             </Grid>
         </Border>
     </Grid>

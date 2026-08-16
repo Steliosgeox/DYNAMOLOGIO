@@ -28,10 +28,18 @@ namespace Dynamologio.Core.Engines
                 Timestamp = asOfTimestamp
             };
 
-            // 1. Έλεγχος Ένταξης στη Δύναμη (Personnel Lifecycle)
+            if (person == null)
+            {
+                snapshot.IsInActiveStrength = false;
+                snapshot.EffectiveStatus = StatusEffect.ExcludedFromStrength;
+                return snapshot;
+            }
+
+            // 1. Έλεγχος Ένταξης στη Δύναμη βάσει Ημερομηνιών Ισχύος (Effective Dates)
+            // ΣΗΜΕΙΩΣΗ: Το IsArchived ΔΕΝ αλλοιώνει τα ιστορικά δεδομένα πριν την ημερομηνία εξόδου
             bool isAfterStart = asOfTimestamp >= person.StrengthStartDate;
             bool isBeforeEnd = !person.StrengthEndDate.HasValue || asOfTimestamp < person.StrengthEndDate.Value;
-            bool isActiveInStrength = isAfterStart && isBeforeEnd && !person.IsArchived;
+            bool isActiveInStrength = isAfterStart && isBeforeEnd;
 
             snapshot.IsInActiveStrength = isActiveInStrength;
 

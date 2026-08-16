@@ -65,7 +65,7 @@ namespace Dynamologio.Core.Projections
         public int TotalAbsent { get; set; }
         public int TotalExcluded { get; set; }
 
-        // Category breakdowns
+        // Category breakdowns (No silent fallthrough)
         public int OfficersAndNcosActive { get; set; }
         public int OfficersAndNcosPresent { get; set; }
         public int OfficersAndNcosAbsent { get; set; }
@@ -74,11 +74,15 @@ namespace Dynamologio.Core.Projections
         public int ConscriptsPresent { get; set; }
         public int ConscriptsAbsent { get; set; }
 
+        public int CiviliansActive { get; set; }
+        public int CiviliansPresent { get; set; }
+        public int CiviliansAbsent { get; set; }
+
         // Reason breakdown counts (e.g. "KA" -> 4, "AA" -> 1, "ΦΠ" -> 2)
         public Dictionary<string, int> AbsencesByReasonCode { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, int> AbsencesByReasonName { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // Returning counts
+        // Returning counts (calculated across all scheduled absence events for that day)
         public int ReturningTodayCount { get; set; }
         public int ReturningTomorrowCount { get; set; }
 

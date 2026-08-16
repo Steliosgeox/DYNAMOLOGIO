@@ -48,20 +48,9 @@ namespace Dynamologio.Core.Engines
                 });
             }
 
-            // 2. Έλεγχος Αρχειοθετημένου / Ανενεργού Προσωπικού
+            // 2. Έλεγχος Ένταξης στη Δύναμη
             if (person != null)
             {
-                if (person.IsArchived)
-                {
-                    results.Add(new ConflictResult
-                    {
-                        Severity = ConflictSeverity.Error,
-                        Code = "PERSON_ARCHIVED",
-                        Message = $"Το στέλεχος/οπλίτης '{person.FullName}' είναι αρχειοθετημένος. Δεν επιτρέπεται καταχώρηση μεταβολής.",
-                        TargetEntityId = person.Id
-                    });
-                }
-
                 if (candidateEvent.StartAt < person.StrengthStartDate)
                 {
                     results.Add(new ConflictResult
@@ -89,7 +78,7 @@ namespace Dynamologio.Core.Engines
             var sTypeDict = statusTypes?.ToDictionary(st => st.Id) ?? new Dictionary<Guid, StatusType>();
             sTypeDict.TryGetValue(candidateEvent.StatusTypeId, out var candidateType);
 
-            if (existingEventsForPerson != null)
+            if (existingEventsForPerson != null && candidateEvent.EndAtExclusive > candidateEvent.StartAt)
             {
                 foreach (var existing in existingEventsForPerson.Where(e => !e.IsCancelled && e.Id != candidateEvent.Id))
                 {
@@ -179,8 +168,8 @@ namespace Dynamologio.Core.Engines
                 var probableDuplicate = existingPersonnel.FirstOrDefault(p =>
                     p.Id != candidatePerson.Id &&
                     p.RankId == candidatePerson.RankId &&
-                    string.Equals(p.LastName.Trim(), candidatePerson.LastName.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(p.FirstName.Trim(), candidatePerson.FirstName.Trim(), StringComparison.OrdinalIgnoreCase));
+                    string.Equals(p.LastName?.Trim(), candidatePerson.LastName?.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(p.FirstName?.Trim(), candidatePerson.FirstName?.Trim(), StringComparison.OrdinalIgnoreCase));
 
                 if (probableDuplicate != null)
                 {
@@ -190,6 +179,79 @@ namespace Dynamologio.Core.Engines
                         Code = "PROBABLE_DUPLICATE_NAME",
                         Message = $"Πιθανή διπλοεγγραφή: Υπάρχει ήδη πρόσωπο με το ίδιο όνομα και βαθμό ({probableDuplicate.FullName}).",
                         TargetEntityId = probableDuplicate.Id
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        public List<ConflictResult> ValidateServiceAssignment(
+            ServiceAssignment assignment,
+            Personnel person,
+            IEnumerable<ServiceAssignment> existingAssignmentsForPerson,
+            IEnumerable<StatusEvent> statusEventsForPerson)
+        {
+            var results = new List<ConflictResult>();
+
+            if (assignment == null)
+            {
+                results.Add(new ConflictResult { Severity = ConflictSeverity.Error, Message = "Η ανάθεση υπηρεσίας δεν μπορεί να είναι κενή." });
+                return results;
+            }
+
+            if (assignment.EndDateTime <= assignment.StartDateTime)
+            {
+                results.Add(new ConflictResult
+                {
+                    Severity = ConflictSeverity.Error,
+                    Code = "INVALID_SERVICE_TIME",
+                    Message = "Η ώρα λήξης της υπηρεσίας πρέπει να είναι μετά την ώρα έναρξης."
+                });
+            }
+
+            // Check person lifecycle
+            if (person != null)
+            {
+                if (assignment.ServiceDate < person.StrengthStartDate || (person.StrengthEndDate.HasValue && assignment.ServiceDate >= person.StrengthEndDate.Value))
+                {
+                    results.Add(new ConflictResult
+                    {
+                        Severity = ConflictSeverity.Error,
+                        Code = "SERVICE_OUTSIDE_STRENGTH",
+                        Message = $"Η ημερομηνία υπηρεσίας ({assignment.ServiceDate:dd/MM/yyyy}) είναι εκτός του διαστήματος ένταξης του προσώπου στη δύναμη."
+                    });
+                }
+            }
+
+            // Check overlapping services for same person
+            if (existingAssignmentsForPerson != null)
+            {
+                foreach (var existing in existingAssignmentsForPerson.Where(s => !s.IsCancelled && s.Id != assignment.Id))
+                {
+                    if (StatusIntervalMath.DoIntervalsOverlap(assignment.StartDateTime, assignment.EndDateTime, existing.StartDateTime, existing.EndDateTime))
+                    {
+                        results.Add(new ConflictResult
+                        {
+                            Severity = ConflictSeverity.Error,
+                            Code = "OVERLAPPING_SERVICE",
+                            Message = $"Το στέλεχος/οπλίτης έχει ήδη ανατεθειμένη υπηρεσία ({existing.StartDateTime:HH:mm} - {existing.EndDateTime:HH:mm}) κατά το ίδιο χρονικό διάστημα."
+                        });
+                    }
+                }
+            }
+
+            // Check if person has an active absence on the service date
+            if (statusEventsForPerson != null)
+            {
+                var activeAbsence = statusEventsForPerson.FirstOrDefault(e => !e.IsCancelled && StatusIntervalMath.IsActiveAt(e.StartAt, e.EndAtExclusive, assignment.StartDateTime));
+                if (activeAbsence != null)
+                {
+                    results.Add(new ConflictResult
+                    {
+                        Severity = ConflictSeverity.Warning,
+                        Code = "SERVICE_DURING_ABSENCE",
+                        Message = $"Προσοχή: Το στέλεχος/οπλίτης έχει καταχωρημένη απουσία ({activeAbsence.StartAt:dd/MM} - {activeAbsence.EndAtExclusive:dd/MM}) κατά την ημερομηνία της υπηρεσίας."
                     });
                 }
             }

@@ -123,14 +123,19 @@ namespace Dynamologio.Infrastructure.Repositories
             aCol.EnsureIndex(x => x.EntityType);
         }
 
+        public void BeginTransaction()
+        {
+            _context.Database.BeginTrans();
+        }
+
         public void Commit()
         {
-            // LiteDB commits document updates automatically upon method invocation.
+            _context.Database.Commit();
         }
 
         public void Rollback()
         {
-            // LiteDB rollback handling where relevant
+            _context.Database.Rollback();
         }
 
         public void Dispose()

@@ -12,6 +12,7 @@ namespace Dynamologio.Core.Engines
         /// </summary>
         public static bool IsActiveAt(DateTime startAt, DateTime endAtExclusive, DateTime target)
         {
+            if (endAtExclusive <= startAt) return false;
             return target >= startAt && target < endAtExclusive;
         }
 
@@ -20,6 +21,7 @@ namespace Dynamologio.Core.Engines
         /// </summary>
         public static bool DoIntervalsOverlap(DateTime s1, DateTime e1, DateTime s2, DateTime e2)
         {
+            if (e1 <= s1 || e2 <= s2) return false;
             return s1 < e2 && s2 < e1;
         }
 
@@ -29,21 +31,17 @@ namespace Dynamologio.Core.Engines
         public static int CalculateDays(DateTime startAt, DateTime endAtExclusive)
         {
             if (endAtExclusive <= startAt) return 0;
-            return (int)Math.Ceiling((endAtExclusive - startAt).TotalDays);
+            return (int)Math.Ceiling((endAtExclusive.Date - startAt.Date).TotalDays);
         }
 
         /// <summary>
-        /// Δημιουργεί κανονικοποιημένο ημερήσιο διάστημα:
-        /// Π.χ. Έναρξη 16/08, Επιστροφή 21/08 -> [16/08 00:00, 21/08 00:00)
+        /// Δημιουργεί κανονικοποιημένο ημερήσιο διάστημα χωρίς σιωπηρή αλλοίωση εσφαλμένων ημερομηνιών:
+        /// Π.χ. Έναρξη 16/08 00:00, Επιστροφή 21/08 00:00 -> [16/08 00:00, 21/08 00:00)
         /// </summary>
         public static void CreateDayInterval(DateTime startDate, DateTime returnDate, out DateTime startAt, out DateTime endAtExclusive)
         {
             startAt = startDate.Date;
             endAtExclusive = returnDate.Date;
-            if (endAtExclusive <= startAt)
-            {
-                endAtExclusive = startAt.AddDays(1);
-            }
         }
     }
 }

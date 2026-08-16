@@ -38,6 +38,8 @@ namespace Dynamologio.Infrastructure.LiteDb
             _database = new LiteDatabase(_connectionString);
         }
 
+        public string DbFilePath => _dbPath;
+
         public LiteDatabase Database
         {
             get

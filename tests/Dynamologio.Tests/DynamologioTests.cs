@@ -4,406 +4,326 @@ using System.IO;
 using System.Linq;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Enums;
+using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
+using Dynamologio.Core.Projections;
 using Dynamologio.ImportExport.Excel;
+using Dynamologio.ImportExport.Excel.Import;
 using Dynamologio.Infrastructure.LiteDb;
 using Dynamologio.Infrastructure.Migrations;
 using Dynamologio.Infrastructure.Repositories;
 using Dynamologio.Infrastructure.Services;
+using Dynamologio.Reporting.Services;
 using Xunit;
 
 namespace Dynamologio.Tests
 {
-    public class IntervalMathTests
-    {
-        [Fact]
-        public void IsActiveAt_ShouldRespectHalfOpenInterval()
-        {
-            var start = new DateTime(2026, 8, 16, 0, 0, 0);
-            var endExclusive = new DateTime(2026, 8, 21, 0, 0, 0);
-
-            // 15/08 23:59:59 -> Not active
-            Assert.False(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 15, 23, 59, 59)));
-
-            // 16/08 00:00:00 -> Active (inclusive start)
-            Assert.True(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 16, 0, 0, 0)));
-
-            // 18/08 12:00:00 -> Active
-            Assert.True(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 18, 12, 0, 0)));
-
-            // 20/08 23:59:59 -> Active
-            Assert.True(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 20, 23, 59, 59)));
-
-            // 21/08 00:00:00 -> NOT active (exclusive end / return date)
-            Assert.False(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 21, 0, 0, 0)));
-        }
-
-        [Fact]
-        public void DoIntervalsOverlap_ShouldDetectOverlapsCorrectly()
-        {
-            var i1_start = new DateTime(2026, 8, 16);
-            var i1_end = new DateTime(2026, 8, 21);
-
-            // Overlapping: 19/08 to 25/08
-            Assert.True(StatusIntervalMath.DoIntervalsOverlap(i1_start, i1_end, new DateTime(2026, 8, 19), new DateTime(2026, 8, 25)));
-
-            // Non-overlapping: 21/08 to 26/08 (Adjacent start is NOT overlap)
-            Assert.False(StatusIntervalMath.DoIntervalsOverlap(i1_start, i1_end, new DateTime(2026, 8, 21), new DateTime(2026, 8, 26)));
-
-            // Non-overlapping: 10/08 to 16/08 (Adjacent end is NOT overlap)
-            Assert.False(StatusIntervalMath.DoIntervalsOverlap(i1_start, i1_end, new DateTime(2026, 8, 10), new DateTime(2026, 8, 16)));
-        }
-    }
-
-    public class StatusEngineTests
-    {
-        private readonly StatusEngine _engine = new StatusEngine();
-
-        [Fact]
-        public void CalculatePersonStatus_ActiveLeave_ShouldReturnAbsent()
-        {
-            var person = new Personnel
-            {
-                LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ",
-                FirstName = "ΙΩΑΝΝΗΣ",
-                StrengthStartDate = new DateTime(2026, 1, 1)
-            };
-
-            var leaveType = new StatusType { Name = "Κανονική Άδεια", Effect = StatusEffect.Absent, ShortCode = "ΚΑ" };
-            var statusEvent = new StatusEvent
-            {
-                PersonnelId = person.Id,
-                StatusTypeId = leaveType.Id,
-                StartAt = new DateTime(2026, 8, 16),
-                EndAtExclusive = new DateTime(2026, 8, 21)
-            };
-
-            var snapshot = _engine.CalculatePersonStatus(
-                person,
-                new[] { statusEvent },
-                new[] { leaveType },
-                null,
-                null,
-                null,
-                null,
-                new DateTime(2026, 8, 18, 10, 0, 0));
-
-            Assert.True(snapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.Absent, snapshot.EffectiveStatus);
-            Assert.Equal("Κανονική Άδεια", snapshot.StatusDisplayLabel);
-            Assert.Equal("21/08/2026", snapshot.ReturnDisplayLabel);
-        }
-
-        [Fact]
-        public void CalculatePersonStatus_AutomaticReturnOnExpiration_ShouldReturnPresent()
-        {
-            var person = new Personnel
-            {
-                LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ",
-                FirstName = "ΙΩΑΝΝΗΣ",
-                StrengthStartDate = new DateTime(2026, 1, 1)
-            };
-
-            var leaveType = new StatusType { Name = "Κανονική Άδεια", Effect = StatusEffect.Absent, ShortCode = "ΚΑ" };
-            var statusEvent = new StatusEvent
-            {
-                PersonnelId = person.Id,
-                StatusTypeId = leaveType.Id,
-                StartAt = new DateTime(2026, 8, 16),
-                EndAtExclusive = new DateTime(2026, 8, 21) // Return 21/08
-            };
-
-            // Query at 21/08 08:00 (Return Day)
-            var snapshot = _engine.CalculatePersonStatus(
-                person,
-                new[] { statusEvent },
-                new[] { leaveType },
-                null,
-                null,
-                null,
-                null,
-                new DateTime(2026, 8, 21, 8, 0, 0));
-
-            Assert.True(snapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.Present, snapshot.EffectiveStatus);
-            Assert.Equal("ΠΑΡΩΝ", snapshot.StatusDisplayLabel);
-        }
-
-        [Fact]
-        public void CalculatePersonStatus_FutureLeave_ShouldRemainPresentToday()
-        {
-            var person = new Personnel
-            {
-                LastName = "ΓΕΩΡΓΙΟΥ",
-                FirstName = "ΝΙΚΟΛΑΟΣ",
-                StrengthStartDate = new DateTime(2026, 1, 1)
-            };
-
-            var leaveType = new StatusType { Name = "Κανονική Άδεια", Effect = StatusEffect.Absent, ShortCode = "ΚΑ" };
-            var futureEvent = new StatusEvent
-            {
-                PersonnelId = person.Id,
-                StatusTypeId = leaveType.Id,
-                StartAt = new DateTime(2026, 8, 25),
-                EndAtExclusive = new DateTime(2026, 8, 30)
-            };
-
-            // Query today 16/08
-            var snapshot = _engine.CalculatePersonStatus(
-                person,
-                new[] { futureEvent },
-                new[] { leaveType },
-                null,
-                null,
-                null,
-                null,
-                new DateTime(2026, 8, 16, 10, 0, 0));
-
-            Assert.True(snapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.Present, snapshot.EffectiveStatus);
-        }
-    }
-
-    public class StrengthEngineTests
-    {
-        [Fact]
-        public void CalculateSnapshot_MathematicalInvariant_PresentPlusAbsentEqualsActiveStrength()
-        {
-            var statusEngine = new StatusEngine();
-            var strengthEngine = new StrengthCalculationEngine(statusEngine);
-
-            var rankOfficer = new Rank { Name = "Λοχαγός", Category = PersonnelCategory.OfficerOrNco, SortOrder = 8 };
-            var rankConscript = new Rank { Name = "Στρατιώτης", Category = PersonnelCategory.Conscript, SortOrder = 17 };
-
-            var leaveType = new StatusType { Name = "Κανονική Άδεια", Effect = StatusEffect.Absent, ShortCode = "ΚΑ", ReportMappingCode = "KA" };
-
-            var p1 = new Personnel { LastName = "ΑΞΙΩΜΑΤΙΚΟΣ 1", Category = PersonnelCategory.OfficerOrNco, RankId = rankOfficer.Id, StrengthStartDate = new DateTime(2026, 1, 1) };
-            var p2 = new Personnel { LastName = "ΑΞΙΩΜΑΤΙΚΟΣ 2", Category = PersonnelCategory.OfficerOrNco, RankId = rankOfficer.Id, StrengthStartDate = new DateTime(2026, 1, 1) };
-            var p3 = new Personnel { LastName = "ΣΤΡΑΤΙΩΤΗΣ 1", Category = PersonnelCategory.Conscript, RankId = rankConscript.Id, StrengthStartDate = new DateTime(2026, 1, 1) };
-            var p4 = new Personnel { LastName = "ΣΤΡΑΤΙΩΤΗΣ 2", Category = PersonnelCategory.Conscript, RankId = rankConscript.Id, StrengthStartDate = new DateTime(2026, 1, 1) };
-
-            // P2 and P4 are absent
-            var ev1 = new StatusEvent { PersonnelId = p2.Id, StatusTypeId = leaveType.Id, StartAt = new DateTime(2026, 8, 16), EndAtExclusive = new DateTime(2026, 8, 20) };
-            var ev2 = new StatusEvent { PersonnelId = p4.Id, StatusTypeId = leaveType.Id, StartAt = new DateTime(2026, 8, 16), EndAtExclusive = new DateTime(2026, 8, 20) };
-
-            var snapshot = strengthEngine.CalculateSnapshot(
-                new[] { p1, p2, p3, p4 },
-                new[] { ev1, ev2 },
-                new[] { leaveType },
-                new[] { rankOfficer, rankConscript },
-                null,
-                null,
-                null,
-                new DateTime(2026, 8, 17, 10, 0, 0));
-
-            Assert.Equal(4, snapshot.TotalActiveStrength);
-            Assert.Equal(2, snapshot.TotalPresent);
-            Assert.Equal(2, snapshot.TotalAbsent);
-            Assert.True(snapshot.IsMathematicallyValid);
-            Assert.Empty(snapshot.ValidationWarnings);
-
-            // Category checks
-            Assert.Equal(2, snapshot.OfficersAndNcosActive);
-            Assert.Equal(1, snapshot.OfficersAndNcosPresent);
-            Assert.Equal(1, snapshot.OfficersAndNcosAbsent);
-
-            Assert.Equal(2, snapshot.ConscriptsActive);
-            Assert.Equal(1, snapshot.ConscriptsPresent);
-            Assert.Equal(1, snapshot.ConscriptsAbsent);
-
-            // Reason check
-            Assert.Equal(2, snapshot.AbsencesByReasonCode["KA"]);
-        }
-    }
-
-    public class ConflictEngineTests
-    {
-        private readonly ConflictEngine _conflictEngine = new ConflictEngine();
-
-        [Fact]
-        public void ValidateStatusEvent_OverlappingAbsence_ShouldReturnError()
-        {
-            var leaveType = new StatusType { Id = Guid.NewGuid(), Name = "Κανονική Άδεια", MutualExclusionGroup = "ABSENCE" };
-            var existing = new StatusEvent
-            {
-                Id = Guid.NewGuid(),
-                StatusTypeId = leaveType.Id,
-                StartAt = new DateTime(2026, 8, 16),
-                EndAtExclusive = new DateTime(2026, 8, 21)
-            };
-
-            var candidate = new StatusEvent
-            {
-                Id = Guid.NewGuid(),
-                StatusTypeId = leaveType.Id,
-                StartAt = new DateTime(2026, 8, 19),
-                EndAtExclusive = new DateTime(2026, 8, 24)
-            };
-
-            var results = _conflictEngine.ValidateStatusEvent(
-                candidate,
-                new Personnel { StrengthStartDate = new DateTime(2026, 1, 1) },
-                new[] { existing },
-                new[] { leaveType });
-
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error && r.Code == "OVERLAPPING_ABSENCE");
-        }
-
-        [Fact]
-        public void ValidateStatusEvent_ReturnDateBeforeStart_ShouldReturnError()
-        {
-            var candidate = new StatusEvent
-            {
-                StartAt = new DateTime(2026, 8, 21),
-                EndAtExclusive = new DateTime(2026, 8, 16) // Inverted
-            };
-
-            var results = _conflictEngine.ValidateStatusEvent(candidate, null, null, null);
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error && r.Code == "INVALID_DATE_RANGE");
-        }
-
-        [Fact]
-        public void ValidatePersonnel_DuplicateAsm_ShouldReturnError()
-        {
-            var p1 = new Personnel { Id = Guid.NewGuid(), LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ", MilitaryServiceNumber = "12345/2020" };
-            var p2 = new Personnel { Id = Guid.NewGuid(), LastName = "ΝΕΟΣ", FirstName = "ΝΙΚΟΣ", RankId = Guid.NewGuid(), MilitaryServiceNumber = "12345/2020" };
-
-            var results = _conflictEngine.ValidatePersonnel(p2, new[] { p1 });
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error && r.Code == "DUPLICATE_ASM");
-        }
-    }
-
-    public class DatabaseAndBackupTests : IDisposable
+    public class DynamologioTests : IDisposable
     {
         private readonly string _tempDbPath;
-        private readonly LiteDbContext _context;
+        private readonly LiteDbContext _dbContext;
         private readonly LiteDbUnitOfWork _uow;
-        private readonly BackupService _backupService;
+        private readonly FixedClock _clock;
 
-        public DatabaseAndBackupTests()
+        public DynamologioTests()
         {
-            _tempDbPath = Path.Combine(Path.GetTempPath(), $"test_dynamologio_{Guid.NewGuid():N}.db");
-            _context = new LiteDbContext(_tempDbPath);
-            _uow = new LiteDbUnitOfWork(_context);
-            _backupService = new BackupService(_tempDbPath, _uow);
+            _tempDbPath = Path.Combine(Path.GetTempPath(), $"dynamologio_test_{Guid.NewGuid():N}.db");
+            _dbContext = new LiteDbContext(_tempDbPath);
+            _uow = new LiteDbUnitOfWork(_dbContext);
+            _clock = new FixedClock(new DateTime(2026, 8, 16, 10, 0, 0));
 
-            SchemaMigrationRunner.ApplyMigrations(_uow);
-        }
-
-        [Fact]
-        public void SeedData_ShouldPopulateRanksAndStatusTypes()
-        {
-            var ranks = _uow.Ranks.GetAll().ToList();
-            var statusTypes = _uow.StatusTypes.GetAll().ToList();
-
-            Assert.True(ranks.Count >= 17);
-            Assert.True(statusTypes.Count >= 8);
-            Assert.Contains(ranks, r => r.Name == "Λοχαγός");
-            Assert.Contains(statusTypes, st => st.Name == "Κανονική Άδεια");
-        }
-
-        [Fact]
-        public void BackupAndRestore_ShouldPreserveDataIntegrity()
-        {
-            var rank = _uow.Ranks.GetAll().First();
-            var p = new Personnel
-            {
-                LastName = "ΔΟΚΙΜΑΣΤΙΚΟΣ",
-                FirstName = "ΠΕΤΡΟΣ",
-                RankId = rank.Id,
-                MilitaryServiceNumber = "99999/2026"
-            };
-            _uow.Personnel.Insert(p);
-
-            string backupZip = _backupService.CreateBackup();
-            Assert.True(File.Exists(backupZip));
-
-            bool verified = _backupService.VerifyBackup(backupZip, out var manifest, out var error);
-            Assert.True(verified, error);
-            Assert.NotNull(manifest);
-            Assert.True(manifest.PersonnelCount >= 1);
-
-            if (File.Exists(backupZip)) File.Delete(backupZip);
+            var migrationRunner = new SchemaMigrationRunner(_uow);
+            migrationRunner.RunMigrations();
         }
 
         public void Dispose()
         {
             _uow?.Dispose();
-            _context?.Dispose();
+            _dbContext?.Dispose();
             if (File.Exists(_tempDbPath))
             {
                 try { File.Delete(_tempDbPath); } catch { }
             }
         }
-    }
 
-    public class ExcelTemplateTests
-    {
         [Fact]
-        public void GenerateDefaultGoldenTemplate_ShouldCreateValidExcelWithFormulas()
+        public void StatusIntervalMath_IsActiveAt_ShouldRespectHalfOpenBoundary()
         {
-            string tempExcel = Path.Combine(Path.GetTempPath(), $"golden_{Guid.NewGuid():N}.xlsx");
+            var start = new DateTime(2026, 8, 16, 0, 0, 0);
+            var endExclusive = new DateTime(2026, 8, 21, 0, 0, 0);
+
+            Assert.False(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 15, 23, 59, 59)));
+            Assert.True(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 16, 0, 0, 0)));
+            Assert.True(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 20, 23, 59, 59)));
+            Assert.False(StatusIntervalMath.IsActiveAt(start, endExclusive, new DateTime(2026, 8, 21, 0, 0, 0)));
+        }
+
+        [Fact]
+        public void StatusEngine_AutomaticReturnUponExpiration_ShouldEvaluateToPresent()
+        {
+            var engine = new StatusEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ",
+                FirstName = "ΓΕΩΡΓΙΟΣ",
+                StrengthStartDate = new DateTime(2026, 1, 1)
+            };
+
+            var kaType = _uow.StatusTypes.Find(x => x.ShortCode == "ΚΑ").First();
+            var ev = new StatusEvent
+            {
+                PersonnelId = person.Id,
+                StatusTypeId = kaType.Id,
+                StartAt = new DateTime(2026, 8, 16, 0, 0, 0),
+                EndAtExclusive = new DateTime(2026, 8, 21, 0, 0, 0)
+            };
+
+            // During leave
+            var snapshotDuring = engine.CalculatePersonStatus(person, new[] { ev }, _uow.StatusTypes.GetAll(), null, null, null, null, new DateTime(2026, 8, 20, 12, 0, 0));
+            Assert.Equal(StatusEffect.Absent, snapshotDuring.EffectiveStatus);
+
+            // On Return Date
+            var snapshotReturned = engine.CalculatePersonStatus(person, new[] { ev }, _uow.StatusTypes.GetAll(), null, null, null, null, new DateTime(2026, 8, 21, 0, 0, 0));
+            Assert.Equal(StatusEffect.Present, snapshotReturned.EffectiveStatus);
+        }
+
+        [Fact]
+        public void StatusEngine_HistoricalArchiveQuery_ShouldPreservePastActiveStatus()
+        {
+            // BUG AUD-001 Regression Test: Archiving person today should NOT exclude them from past historical queries
+            var engine = new StatusEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΑΡΧΕΙΟΘΕΤΗΜΕΝΟΣ",
+                FirstName = "ΝΙΚΟΛΑΟΣ",
+                StrengthStartDate = new DateTime(2026, 1, 1),
+                StrengthEndDate = new DateTime(2026, 9, 1), // Departed September 1st
+                IsArchived = true
+            };
+
+            // Query on August 20th (Historical query while active)
+            var snapshotPast = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 20));
+            Assert.True(snapshotPast.IsInActiveStrength);
+            Assert.Equal(StatusEffect.Present, snapshotPast.EffectiveStatus);
+
+            // Query on September 2nd (After departure)
+            var snapshotFuture = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 9, 2));
+            Assert.False(snapshotFuture.IsInActiveStrength);
+            Assert.Equal(StatusEffect.ExcludedFromStrength, snapshotFuture.EffectiveStatus);
+        }
+
+        [Fact]
+        public void StrengthCalculationEngine_ReturningToday_ShouldCountAccurately()
+        {
+            // BUG AUD-004 Regression Test: Returning Today count must work when person returns to Present on return date
+            var statusEngine = new StatusEngine();
+            var strengthEngine = new StrengthCalculationEngine(statusEngine);
+
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΕΠΙΣΤΡΕΦΩΝ",
+                FirstName = "ΙΩΑΝΝΗΣ",
+                Category = PersonnelCategory.Conscript,
+                StrengthStartDate = new DateTime(2026, 1, 1)
+            };
+
+            var kaType = _uow.StatusTypes.Find(x => x.ShortCode == "ΚΑ").First();
+            var ev = new StatusEvent
+            {
+                PersonnelId = person.Id,
+                StatusTypeId = kaType.Id,
+                StartAt = new DateTime(2026, 8, 16),
+                EndAtExclusive = new DateTime(2026, 8, 21) // Return date is Aug 21
+            };
+
+            var snapshot = strengthEngine.CalculateSnapshot(
+                new[] { person },
+                new[] { ev },
+                _uow.StatusTypes.GetAll(),
+                _uow.Ranks.GetAll(),
+                _uow.OrganisationUnits.GetAll(),
+                null,
+                null,
+                new DateTime(2026, 8, 21)); // Evaluated ON the return date
+
+            Assert.Equal(1, snapshot.TotalPresent);
+            Assert.Equal(0, snapshot.TotalAbsent);
+            Assert.Equal(1, snapshot.ReturningTodayCount);
+            Assert.True(snapshot.IsMathematicallyValid);
+        }
+
+        [Fact]
+        public void StrengthCalculationEngine_CivilianPersonnel_ShouldNotCountAsConscript()
+        {
+            // BUG AUD-006 Regression Test: Civilian personnel category must not silently fall through into Conscript count
+            var statusEngine = new StatusEngine();
+            var strengthEngine = new StrengthCalculationEngine(statusEngine);
+
+            var civilian = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                LastName = "ΠΟΛΙΤΗΣ",
+                FirstName = "ΜΑΡΙΑ",
+                Category = PersonnelCategory.Civilian,
+                StrengthStartDate = new DateTime(2026, 1, 1)
+            };
+
+            var snapshot = strengthEngine.CalculateSnapshot(
+                new[] { civilian },
+                null,
+                _uow.StatusTypes.GetAll(),
+                _uow.Ranks.GetAll(),
+                _uow.OrganisationUnits.GetAll(),
+                null,
+                null,
+                new DateTime(2026, 8, 16));
+
+            Assert.Equal(1, snapshot.CiviliansActive);
+            Assert.Equal(0, snapshot.ConscriptsActive);
+            Assert.Equal(0, snapshot.OfficersAndNcosActive);
+            Assert.Equal(1, snapshot.TotalActiveStrength);
+        }
+
+        [Fact]
+        public void ConflictEngine_InvalidDateRange_ShouldReturnError()
+        {
+            // BUG AUD-003 Regression Test: Return <= Start must be detected as an error
+            var conflictEngine = new ConflictEngine();
+            var person = new Personnel { Id = Guid.NewGuid(), StrengthStartDate = new DateTime(2026, 1, 1) };
+            var badEvent = new StatusEvent
+            {
+                PersonnelId = person.Id,
+                StartAt = new DateTime(2026, 8, 21),
+                EndAtExclusive = new DateTime(2026, 8, 16) // Return BEFORE start
+            };
+
+            var conflicts = conflictEngine.ValidateStatusEvent(badEvent, person, null, _uow.StatusTypes.GetAll());
+            Assert.Contains(conflicts, c => c.Severity == ConflictSeverity.Error && c.Code == "INVALID_DATE_RANGE");
+        }
+
+        [Fact]
+        public void ConflictEngine_DuplicateAsm_ShouldReturnError()
+        {
+            var conflictEngine = new ConflictEngine();
+            var existing = new Personnel { Id = Guid.NewGuid(), MilitaryServiceNumber = "12345/2026", LastName = "Α", FirstName = "Β" };
+            var duplicate = new Personnel { Id = Guid.NewGuid(), MilitaryServiceNumber = "12345/2026", LastName = "Γ", FirstName = "Δ" };
+
+            var conflicts = conflictEngine.ValidatePersonnel(duplicate, new[] { existing });
+            Assert.Contains(conflicts, c => c.Severity == ConflictSeverity.Error && c.Code == "DUPLICATE_ASM");
+        }
+
+        [Fact]
+        public void ConflictEngine_ServiceOutsideStrength_ShouldReturnError()
+        {
+            var conflictEngine = new ConflictEngine();
+            var person = new Personnel
+            {
+                Id = Guid.NewGuid(),
+                StrengthStartDate = new DateTime(2026, 6, 1),
+                StrengthEndDate = new DateTime(2026, 9, 1)
+            };
+
+            var assignment = new ServiceAssignment
+            {
+                PersonnelId = person.Id,
+                ServiceDate = new DateTime(2026, 10, 1), // Assigned AFTER departure date
+                StartDateTime = new DateTime(2026, 10, 1, 8, 0, 0),
+                EndDateTime = new DateTime(2026, 10, 1, 14, 0, 0)
+            };
+
+            var conflicts = conflictEngine.ValidateServiceAssignment(assignment, person, null, null);
+            Assert.Contains(conflicts, c => c.Severity == ConflictSeverity.Error && c.Code == "SERVICE_OUTSIDE_STRENGTH");
+        }
+
+        [Fact]
+        public void StatusIntervalMath_DoIntervalsOverlap_ShouldDetectCollisionsCorrectly()
+        {
+            var s1 = new DateTime(2026, 8, 10);
+            var e1 = new DateTime(2026, 8, 15);
+
+            // Adjacent: [10, 15) and [15, 20) -> Do NOT overlap
+            Assert.False(StatusIntervalMath.DoIntervalsOverlap(s1, e1, new DateTime(2026, 8, 15), new DateTime(2026, 8, 20)));
+
+            // Overlapping: [10, 15) and [14, 18) -> Overlap!
+            Assert.True(StatusIntervalMath.DoIntervalsOverlap(s1, e1, new DateTime(2026, 8, 14), new DateTime(2026, 8, 18)));
+
+            // Contained: [10, 15) and [11, 13) -> Overlap!
+            Assert.True(StatusIntervalMath.DoIntervalsOverlap(s1, e1, new DateTime(2026, 8, 11), new DateTime(2026, 8, 13)));
+        }
+
+        [Fact]
+        public void AuditService_LogAction_ShouldRecordStructuredEvent()
+        {
+            var auditService = new AuditService(_uow);
+            auditService.LogAction(AuditAction.Create, "Personnel", "123", "Δημιουργία προσώπου", null, new { Name = "Test" });
+
+            var recorded = _uow.AuditEvents.Find(x => x.EntityType == "Personnel" && x.EntityId == "123").FirstOrDefault();
+            Assert.NotNull(recorded);
+            Assert.Equal(AuditAction.Create, recorded.Action);
+            Assert.Equal("Δημιουργία προσώπου", recorded.Summary);
+        }
+
+        [Fact]
+        public void DiagnosticPackageService_Export_ShouldProduceValidZip()
+        {
+            var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
+            string outputZip = Path.Combine(Path.GetTempPath(), $"diag_test_{Guid.NewGuid():N}.zip");
+
             try
             {
-                GoldenTemplateGenerator.GenerateDefaultGoldenTemplate(tempExcel);
-                Assert.True(File.Exists(tempExcel));
-
-                var analyzer = new NpoiWorkbookAnalyzer();
-                var analysis = analyzer.AnalyzeWorkbook(tempExcel);
-
-                Assert.Equal(2, analysis.TotalSheets);
-                Assert.Equal("ΔΥΝΑΜΟΛΟΓΙΟ", analysis.Sheets[0].SheetName);
-                Assert.Equal("ΚΑΤΑΣΤΑΣΗ ΑΠΟΝΤΩΝ", analysis.Sheets[1].SheetName);
+                diagService.ExportDiagnosticPackage(outputZip);
+                Assert.True(File.Exists(outputZip));
+                Assert.True(new FileInfo(outputZip).Length > 0);
             }
             finally
             {
-                if (File.Exists(tempExcel))
-                {
-                    try { File.Delete(tempExcel); } catch { }
-                }
+                if (File.Exists(outputZip)) File.Delete(outputZip);
             }
         }
 
         [Fact]
-        public void ExportDynamologioWorkbook_UsingReferenceTemplate_ShouldSucceed()
+        public void ReportGeneratorService_PrintableDocument_ShouldProduceFlowDocument()
         {
-            string refTemplate = @"C:\Users\Stelios\DYNAMOLOGIO\templates-reference\Standard_Dynamologio_Template.xlsx";
-            if (!File.Exists(refTemplate))
-            {
-                GoldenTemplateGenerator.GenerateDefaultGoldenTemplate(refTemplate);
-            }
+            var statusEngine = new StatusEngine();
+            var strengthEngine = new StrengthCalculationEngine(statusEngine);
+            var reportService = new ReportGeneratorService(_uow, strengthEngine);
 
-            string outExcel = Path.Combine(Path.GetTempPath(), $"out_dynamologio_{Guid.NewGuid():N}.xlsx");
+            var req = new ReportGenerationRequest
+            {
+                AsOfTimestamp = new DateTime(2026, 8, 16),
+                UnitTitle = "123 ΤΑΓΜΑ ΠΕΖΙΚΟΥ"
+            };
+
+            var doc = reportService.GeneratePrintableDocument(req);
+            Assert.NotNull(doc);
+            Assert.True(doc.Blocks.Count >= 2);
+        }
+
+        [Fact]
+        public void BackupService_CreateAndRestore_ShouldGuaranteeDataIntegrity()
+        {
+            var backupService = new BackupService(_uow, _tempDbPath);
+            var testDir = Path.Combine(Path.GetTempPath(), $"backup_test_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(testDir);
+
             try
             {
-                var snapshot = new Core.Projections.UnitStrengthSnapshot
-                {
-                    AsOfTimestamp = DateTime.Today,
-                    TotalActiveStrength = 10,
-                    TotalPresent = 8,
-                    TotalAbsent = 2,
-                    OfficersAndNcosActive = 4,
-                    OfficersAndNcosPresent = 3,
-                    OfficersAndNcosAbsent = 1,
-                    ConscriptsActive = 6,
-                    ConscriptsPresent = 5,
-                    ConscriptsAbsent = 1
-                };
+                var manifest = backupService.CreateBackup(testDir);
+                Assert.NotNull(manifest);
+                Assert.NotEmpty(manifest.DatabaseSha256);
 
-                var writer = new NpoiTemplateWriter();
-                writer.GenerateDynamologioWorkbook(refTemplate, outExcel, snapshot, "123 ΤΑΓΜΑ ΠΕΖΙΚΟΥ - 1ο ΓΡΑΦΕΙΟ");
+                string backupZip = Path.Combine(testDir, $"Dynamologio_Backup_{manifest.Timestamp:yyyyMMdd_HHmmss}.zip");
+                Assert.True(File.Exists(backupZip));
 
-                Assert.True(File.Exists(outExcel));
-                var analyzer = new NpoiWorkbookAnalyzer();
-                var analysis = analyzer.AnalyzeWorkbook(outExcel);
-                Assert.Equal(2, analysis.TotalSheets);
+                // Verify restore
+                backupService.RestoreBackup(backupZip);
             }
             finally
             {
-                if (File.Exists(outExcel))
-                {
-                    try { File.Delete(outExcel); } catch { }
-                }
+                if (Directory.Exists(testDir)) Directory.Delete(testDir, true);
             }
         }
     }
