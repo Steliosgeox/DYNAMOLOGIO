@@ -106,10 +106,33 @@
                 <StackPanel>
                     <TextBlock Text="Άμεσες Ενέργειες" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,12" />
 
-                    <Button Content="📊 Προβολή Δυναμολογίου" Command="{Binding NavigateToDynamologioCommand}" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,0,8" HorizontalContentAlignment="Left" />
-                    <Button Content="📝 Καταχώρηση Μεταβολής" Command="{Binding NavigateToAbsencesCommand}" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,0,8" HorizontalContentAlignment="Left" />
-                    <Button Content="👥 Μητρώο Προσωπικού" Command="{Binding NavigateToPersonnelCommand}" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,0,8" HorizontalContentAlignment="Left" />
-                    <Button Content="🛡️ Ημερήσιες Υπηρεσίες" Command="{Binding NavigateToServicesCommand}" Style="{StaticResource SecondaryButton}" Height="36" HorizontalContentAlignment="Left" />
+                    <Button Command="{Binding NavigateToDynamologioCommand}" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconStrengthGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,10,0" />
+                            <TextBlock Text="Προβολή Δυναμολογίου" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding NavigateToAbsencesCommand}" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,10,0" />
+                            <TextBlock Text="Καταχώρηση Απουσίας" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding NavigateToPersonnelCommand}" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,10,0" />
+                            <TextBlock Text="Μητρώο Προσωπικού" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding NavigateToServicesCommand}" Style="{StaticResource SecondaryButton}" Height="36">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconServiceGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,10,0" />
+                            <TextBlock Text="Ημερήσιες Υπηρεσίες" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

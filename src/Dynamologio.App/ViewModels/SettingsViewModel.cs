@@ -105,7 +105,7 @@ namespace Dynamologio.App.ViewModels
                         File.Copy(defaultZip, sfd.FileName, true);
                     }
 
-                    StatusMessage = $"Αντίγραφο ασφαλείας δημιουργήθηκε επιτυχώς (SHA-256: {manifest.DatabaseSha256.Substring(0, 8)}...).";
+                    StatusMessage = $"Αντίγραφο ασφαλείας δημιουργήθηκε επιτυχώς (SHA-256: {manifest.DatabaseSha256Checksum.Substring(0, 8)}...).";
                     MessageBox.Show($"Το αντίγραφο ασφαλείας δημιουργήθηκε επιτυχώς:\n{sfd.FileName}", "Αντίγραφο Ασφαλείας", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }

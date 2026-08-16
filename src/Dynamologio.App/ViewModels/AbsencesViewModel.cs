@@ -118,7 +118,7 @@ namespace Dynamologio.App.ViewModels
             {
                 if (ReturnDate <= StartDate)
                 {
-                    return "⚠️ Η ημερομηνία επιστροφής πρέπει να είναι μετά την ημερομηνία έναρξης.";
+                    return "Η ημερομηνία επιστροφής πρέπει να είναι μετά την ημερομηνία έναρξης.";
                 }
                 int days = StatusIntervalMath.CalculateDays(StartDate, ReturnDate);
                 var lastDay = ReturnDate.AddDays(-1);

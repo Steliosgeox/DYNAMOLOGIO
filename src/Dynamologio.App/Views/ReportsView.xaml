@@ -22,8 +22,18 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Content="📊 Εξαγωγή Excel" Command="{Binding ExportExcelCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,8,0" />
-                <Button Content="🖨️ Εκτύπωση" Command="{Binding PrintReportCommand}" Style="{StaticResource SecondaryButton}" Height="34" />
+                <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconImportGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="Εξαγωγή Excel" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding PrintReportCommand}" Style="{StaticResource SecondaryButton}" Height="34">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconPrintGeometry}" Fill="{StaticResource TextPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="Εκτύπωση" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
 

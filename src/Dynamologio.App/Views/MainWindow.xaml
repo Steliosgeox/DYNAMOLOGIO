@@ -4,7 +4,7 @@
         xmlns:vm="clr-namespace:Dynamologio.App.ViewModels"
         xmlns:views="clr-namespace:Dynamologio.App.Views"
         Title="ΔΥΝΑΜΟΛΟΓΙΟ — Σταθμός Διαχείρισης Δύναμης &amp; Μεταβολών Προσωπικού"
-        Height="800" Width="1240" MinHeight="680" MinWidth="1024"
+        Height="820" Width="1280" MinHeight="700" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource CanvasBgBrush}"
         FontFamily="Segoe UI">
@@ -40,13 +40,52 @@
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsView />
         </DataTemplate>
+
+        <!-- Navigation Button Style with Active Selection Triggers -->
+        <Style x:Key="SidebarNavButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="navBorder" Background="{TemplateBinding Background}" Padding="12,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="4" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Active Indicator Strip -->
+                                <Rectangle x:Name="activeIndicator" Grid.Column="0" Fill="#38BDF8" Width="4" RadiusX="2" RadiusY="2" Visibility="Collapsed" />
+
+                                <!-- Content -->
+                                <ContentPresenter Grid.Column="2" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarHoverBrush}" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="52" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="26" />
+            <RowDefinition Height="28" />
         </Grid.RowDefinitions>
 
         <!-- Top Header Chrome -->
@@ -60,7 +99,6 @@
 
                 <!-- App Brand & Unit Info -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Vector Mark -->
                     <Path Data="{StaticResource IconAppLogoGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="20" Height="20" Stretch="Uniform" Margin="0,0,10,0" VerticalAlignment="Center" />
                     <TextBlock Text="ΔΥΝΑΜΟΛΟΓΙΟ" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                     <TextBlock Text=" | " FontSize="14" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="4,0" />
@@ -69,10 +107,10 @@
                     <TextBlock Text="{Binding OfficeNameHeader}" FontSize="13" Foreground="#94A3B8" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- Offline Operational Tag -->
+                <!-- Offline Tag -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="3" Padding="8,3">
-                        <TextBlock Text="Τοπικός Σταθμός (Offline)" FontSize="11" Foreground="#94A3B8" />
+                    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="4" Padding="8,4">
+                        <TextBlock Text="Τοπικός Σταθμός (Air-Gapped)" FontSize="11" Foreground="#94A3B8" />
                     </Border>
                 </StackPanel>
             </Grid>
@@ -81,84 +119,195 @@
         <!-- Main Body: Navigation Sidebar + Content Area -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="220" MinWidth="180" MaxWidth="260" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Navigation Sidebar (Dark Navy Rail) -->
+            <!-- Navigation Sidebar (Slate Navy) -->
             <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,10,0,10">
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
+                        
+                        <!-- Dashboard Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Αρχική" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Dashboard">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
+                        <!-- Dynamologio Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Δυναμολόγιο" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Dynamologio">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Personnel">
+                        <!-- Personnel Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Personnel">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Προσωπικό" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Personnel">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Absences">
+                        <!-- Absences Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Absences">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Απουσίες &amp; Άδειες" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Absences">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Services">
+                        <!-- Services Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Services">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Υπηρεσίες" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Services">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Reports">
+                        <!-- Reports Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Reports">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconPrintGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Αναφορές &amp; Εξαγωγές" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Reports">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
                         <Separator Background="#334155" Margin="14,10" Height="1" />
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
+                        <!-- Import Excel Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Εισαγωγή Excel" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="ImportExport">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
+                        <!-- Data Validation Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Έλεγχος Δεδομένων" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="DataValidation">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="History">
+                        <!-- History Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="History">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Ιστορικό (Audit)" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="History">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
 
-                        <Button Style="{StaticResource NavRailButton}" Command="{Binding NavigateCommand}" CommandParameter="Settings">
+                        <!-- Settings Nav Item -->
+                        <Button Command="{Binding NavigateCommand}" CommandParameter="Settings">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Ρυθμίσεις &amp; Backup" VerticalAlignment="Center" />
                             </StackPanel>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Settings">
+                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                         </Button>
                     </StackPanel>
                 </ScrollViewer>
@@ -176,7 +325,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                <TextBlock Grid.Column="0" Text="Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη (DPAPI Protected)." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <TextBlock Grid.Column="1" Text="ΔΥΝΑΜΟΛΟΓΙΟ v1.0.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
             </Grid>
         </Border>

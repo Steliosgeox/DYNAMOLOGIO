@@ -102,7 +102,7 @@
         </Border>
 
         <!-- Inline Error Banner -->
-        <TextBlock Grid.Row="2" Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,8" Visibility="{Binding ErrorMessage, Converter={x:Null}}" />
+        <TextBlock Grid.Row="2" Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,8" Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisConverter}}" />
 
         <!-- Dialog Buttons -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

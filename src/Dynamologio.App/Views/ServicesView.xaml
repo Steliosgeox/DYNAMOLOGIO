@@ -9,8 +9,8 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header Strip & Date Navigation -->
-        <Grid Grid.Row="0" Margin="0,0,0,14">
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -18,26 +18,27 @@
 
             <StackPanel Grid.Column="0">
                 <TextBlock Text="Ημερήσιες Υπηρεσίες &amp; Καθήκοντα" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
-                <TextBlock Text="Προγραμματισμός βαρδιών, αναθέσεων σκοπιών και ελέγχων υπηρεσίας" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                <TextBlock Text="Προγραμματισμός βαρδιών, αναθέσεων σκοπών και ελέγχων υπηρεσίας" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
             </StackPanel>
 
+            <!-- Date Selector -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Ημερομηνία:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <DatePicker SelectedDate="{Binding SelectedDate}" Width="120" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <Button Content="Σήμερα" Command="{Binding SetTodayCommand}" Style="{StaticResource SecondaryButton}" Width="75" Margin="0,0,6,0" />
-                <Button Content="Αύριο" Command="{Binding SetTomorrowCommand}" Style="{StaticResource SecondaryButton}" Width="75" />
+                <DatePicker SelectedDate="{Binding SelectedDate}" Width="130" Margin="0,0,6,0" />
+                <Button Content="Σήμερα" Command="{Binding SetTodayCommand}" Style="{StaticResource SecondaryButton}" Height="30" Margin="0,0,4,0" />
+                <Button Content="Αύριο" Command="{Binding SetTomorrowCommand}" Style="{StaticResource SecondaryButton}" Height="30" />
             </StackPanel>
         </Grid>
 
         <!-- Main Content -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="360" MinWidth="320" MaxWidth="420" />
+                <ColumnDefinition Width="340" MinWidth="300" MaxWidth="380" />
                 <ColumnDefinition Width="14" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Assign Service Form -->
+            <!-- Left: Assignment Form Card -->
             <Border Grid.Column="0" Style="{StaticResource CardContainer}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
@@ -45,49 +46,49 @@
 
                         <!-- Person Selector -->
                         <TextBlock Text="Στέλεχος / Οπλίτης *" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <ComboBox ItemsSource="{Binding PersonnelList}" SelectedItem="{Binding SelectedPerson}" DisplayMemberPath="FullName" Margin="0,0,0,10" />
+                        <ComboBox ItemsSource="{Binding ActivePersonnelList}" SelectedItem="{Binding SelectedPerson}" DisplayMemberPath="DisplayName" Height="32" Margin="0,0,0,10" />
 
                         <!-- Service Type -->
                         <TextBlock Text="Είδος Υπηρεσίας *" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <ComboBox ItemsSource="{Binding ServiceTypesList}" SelectedItem="{Binding SelectedServiceType}" DisplayMemberPath="Name" Margin="0,0,0,10" />
+                        <ComboBox ItemsSource="{Binding ServiceTypesList}" SelectedItem="{Binding SelectedServiceType}" DisplayMemberPath="Name" Height="32" Margin="0,0,0,10" />
 
-                        <!-- Times -->
+                        <!-- Time Hours -->
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="8" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Ώρα Έναρξης" FontWeight="SemiBold" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding StartTime, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Ώρα Έναρξης" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                <TextBox Text="{Binding StartTimeText}" Height="32" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Ώρα Λήξης" FontWeight="SemiBold" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding EndTime, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Ώρα Λήξης" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                <TextBox Text="{Binding EndTimeText}" Height="32" />
                             </StackPanel>
                         </Grid>
 
                         <!-- Location -->
                         <TextBlock Text="Τοποθεσία / Σημείο" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+                        <TextBox Text="{Binding Location}" Height="32" Margin="0,0,0,10" />
 
                         <!-- Notes -->
                         <TextBlock Text="Παρατηρήσεις" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Height="45" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,12" />
+                        <TextBox Text="{Binding Notes}" Height="54" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,14" />
 
-                        <!-- Inline Error -->
-                        <TextBlock Text="{Binding InlineErrorMessage}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="{Binding InlineErrorMessage, Converter={x:Null}}" />
+                        <!-- Feedback Message -->
+                        <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisConverter}}" />
 
-                        <!-- Action Submit -->
-                        <Button Content="Καταχώρηση Υπηρεσίας" Command="{Binding SaveServiceCommand}" Style="{StaticResource PrimaryButton}" Height="34" />
+                        <Button Content="Καταχώρηση Υπηρεσίας" Command="{Binding AssignServiceCommand}" Style="{StaticResource PrimaryButton}" Height="36" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
 
-            <!-- Right: Daily Services Table -->
+            <!-- Right: Services Roster Table with Empty State -->
             <Border Grid.Column="2" Style="{StaticResource CardContainer}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -97,26 +98,28 @@
 
                     <TextBlock Grid.Row="0" Text="Πρόγραμμα Υπηρεσιών Επιλεγμένης Ημέρας" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,10" />
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding DailyServicesList}">
+                    <!-- Roster DataGrid -->
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding DailyAssignmentsList}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="80" />
-                            <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding PersonFullName}" Width="*" />
-                            <DataGridTextColumn Header="Είδος Υπηρεσίας" Binding="{Binding ServiceName}" Width="130" />
+                            <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding PersonName}" Width="*" />
+                            <DataGridTextColumn Header="Είδος Υπηρεσίας" Binding="{Binding ServiceName}" Width="150" />
                             <DataGridTextColumn Header="Ώρες" Binding="{Binding HoursDisplay}" Width="100" />
                             <DataGridTextColumn Header="Τοποθεσία" Binding="{Binding Location}" Width="110" />
                             <DataGridTemplateColumn Header="Ενέργειες" Width="80">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="Ακύρωση"
-                                                Command="{Binding DataContext.CancelServiceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource DangerButton}"
-                                                FontSize="11" Padding="6,2" />
+                                        <Button Content="Ακύρωση" Command="{Binding DataContext.CancelAssignmentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Style="{StaticResource QuietButton}" Foreground="{StaticResource DangerBrush}" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+
+                    <!-- Empty State Overlay -->
+                    <Border Grid.Row="1" Background="White" Visibility="{Binding HasAssignments, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}" IsHitTestVisible="False">
+                        <!-- Shows only when empty -->
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

@@ -1,113 +1,223 @@
 <UserControl x:Class="Dynamologio.App.Views.DynamologioView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" 
-             d:DesignHeight="650" d:DesignWidth="950">
-    <Grid Margin="20">
+             Background="{StaticResource CanvasBgBrush}">
+
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Date & Unit Selector Bar + Export Actions -->
-        <Border Grid.Row="0" Style="{StaticResource CardContainer}" Margin="0,0,0,16" Padding="12">
+        <!-- Header & Action Bar -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Ημερήσιο Δυναμολόγιο &amp; Κατάσταση Δύναμης" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
+                <TextBlock Text="Επισκόπηση ενεργής δύναμης, παρόντων, απόντων και εξαγωγές επίσημων αναφορών" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+            </StackPanel>
+
+            <!-- Actions -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconImportGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="Εξαγωγή Excel" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding PrintReportCommand}" Style="{StaticResource SecondaryButton}" Height="34">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconPrintGeometry}" Fill="{StaticResource TextPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="Εκτύπωση" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Command Filter Bar -->
+        <Border Grid.Row="1" Style="{StaticResource CardContainer}" Padding="12" Margin="0,0,0,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Ημερομηνία Δυναμολογίου:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                <DatePicker Grid.Column="1" SelectedDate="{Binding SelectedDate}" Width="140" VerticalAlignment="Center" Margin="0,0,20,0" />
+                <!-- Date Controls -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Ημερομηνία:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <DatePicker SelectedDate="{Binding SelectedDate}" Width="130" Margin="0,0,6,0" />
+                    <Button Content="Σήμερα" Command="{Binding SetTodayCommand}" Style="{StaticResource SecondaryButton}" Height="30" Margin="0,0,4,0" />
+                    <Button Content="Αύριο" Command="{Binding SetTomorrowCommand}" Style="{StaticResource SecondaryButton}" Height="30" />
+                </StackPanel>
 
-                <TextBlock Grid.Column="2" Text="Υπομονάδα / Λόχος:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                <ComboBox Grid.Column="3" ItemsSource="{Binding UnitsList}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedUnit}" Width="220" VerticalAlignment="Center" />
+                <!-- Unit / Company Scope Filter -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Λόχος / Υπομονάδα:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox ItemsSource="{Binding OrganisationUnitsList}" SelectedItem="{Binding SelectedUnit}" DisplayMemberPath="Name" Width="220" />
+                </StackPanel>
 
-                <Button Grid.Column="5" Content="📥 Εξαγωγή σε Excel (.xlsx)" Style="{StaticResource PrimaryButton}" Command="{Binding ExportExcelCommand}" Margin="0,0,8,0" />
-                <Button Grid.Column="6" Content="🖨️ Εκτύπωση (Windows Print)" Style="{StaticResource SecondaryButton}" Command="{Binding PrintReportCommand}" />
+                <!-- Template Status Chip -->
+                <Border Grid.Column="4" Background="#ECFDF5" BorderBrush="#A7F3D0" BorderThickness="1" CornerRadius="4" Padding="10,4" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconValidationGeometry}" Fill="{StaticResource PresentBrush}" Width="12" Height="12" Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Πρότυπο: Επαληθευμένο" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource PresentBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
-        <!-- Official Matrix Summary -->
-        <Border Grid.Row="1" Style="{StaticResource CardContainer}" Margin="0,0,0,16" Padding="14">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+        <!-- Main Body: Strength Matrix & Nominal Lists -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340" MinWidth="300" MaxWidth="380" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                <!-- Header -->
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="ΚΑΤΗΓΟΡΙΑ" FontWeight="Bold" Foreground="#475569" Margin="4" />
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="ΥΠΑΡΧΟΥΣΑ ΔΥΝΑΜΗ" FontWeight="Bold" Foreground="#475569" HorizontalAlignment="Center" Margin="4" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="ΠΑΡΟΝΤΕΣ" FontWeight="Bold" Foreground="#059669" HorizontalAlignment="Center" Margin="4" />
-                <TextBlock Grid.Row="0" Grid.Column="3" Text="ΑΠΟΝΤΕΣ" FontWeight="Bold" Foreground="#DC2626" HorizontalAlignment="Center" Margin="4" />
+            <!-- Left: Operational Strength Breakdown Card -->
+            <Border Grid.Column="0" Style="{StaticResource CardContainer}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Αριθμητική Σύνοψη Δύναμης" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,12" />
 
-                <!-- Officers -->
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="ΣΤΕΛΕΧΗ (Αξ/κοι - Υπαξ/κοι)" FontWeight="SemiBold" Margin="4,8" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentSnapshot.OfficersAndNcosActive}" FontWeight="Bold" HorizontalAlignment="Center" Margin="4,8" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding CurrentSnapshot.OfficersAndNcosPresent}" FontWeight="Bold" Foreground="#059669" HorizontalAlignment="Center" Margin="4,8" />
-                <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding CurrentSnapshot.OfficersAndNcosAbsent}" FontWeight="Bold" Foreground="#DC2626" HorizontalAlignment="Center" Margin="4,8" />
+                        <!-- KPI Summary Grid -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                <!-- Conscripts -->
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="ΟΠΛΙΤΕΣ (Στρατιώτες Θητείας)" FontWeight="SemiBold" Margin="4,8" />
-                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentSnapshot.ConscriptsActive}" FontWeight="Bold" HorizontalAlignment="Center" Margin="4,8" />
-                <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding CurrentSnapshot.ConscriptsPresent}" FontWeight="Bold" Foreground="#059669" HorizontalAlignment="Center" Margin="4,8" />
-                <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding CurrentSnapshot.ConscriptsAbsent}" FontWeight="Bold" Foreground="#DC2626" HorizontalAlignment="Center" Margin="4,8" />
+                            <Border Grid.Row="0" Grid.Column="0" Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,4,0">
+                                <StackPanel>
+                                    <TextBlock Text="ΕΝΕΡΓΗ ΔΥΝΑΜΗ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                                    <TextBlock Text="{Binding CurrentSnapshot.TotalActiveStrength}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
+                                </StackPanel>
+                            </Border>
 
-                <!-- General Total -->
-                <Border Grid.Row="3" Grid.ColumnSpan="4" Background="#E2E8F0" Height="1" Margin="0,4" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="ΓΕΝΙΚΟ ΣΥΝΟΛΟ ΜΟΝΑΔΟΣ" FontWeight="Bold" Foreground="#1E293B" Margin="4,10,4,4" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentSnapshot.TotalActiveStrength}" FontWeight="Bold" FontSize="15" Foreground="#1E293B" HorizontalAlignment="Center" Margin="4,10,4,4" />
-                <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding CurrentSnapshot.TotalPresent}" FontWeight="Bold" FontSize="15" Foreground="#059669" HorizontalAlignment="Center" Margin="4,10,4,4" />
-                <TextBlock Grid.Row="3" Grid.Column="3" Text="{Binding CurrentSnapshot.TotalAbsent}" FontWeight="Bold" FontSize="15" Foreground="#DC2626" HorizontalAlignment="Center" Margin="4,10,4,4" />
-            </Grid>
-        </Border>
+                            <Border Grid.Row="0" Grid.Column="1" Background="#ECFDF5" BorderBrush="#A7F3D0" BorderThickness="1" CornerRadius="4" Padding="10" Margin="4,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="ΠΑΡΟΝΤΕΣ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource PresentBrush}" />
+                                    <TextBlock Text="{Binding CurrentSnapshot.TotalPresent}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource PresentBrush}" />
+                                </StackPanel>
+                            </Border>
 
-        <!-- Detail Tabs (Present / Absent) -->
-        <TabControl Grid.Row="2">
-            <TabItem Header="📋 Κατάσταση Παρόντων">
-                <DataGrid ItemsSource="{Binding PresentList}" Margin="0,10,0,0">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Βαθμός" Binding="{Binding Rank.ShortName}" Width="110" />
-                        <DataGridTextColumn Header="Επώνυμο" Binding="{Binding Person.LastName}" Width="160" />
-                        <DataGridTextColumn Header="Όνομα" Binding="{Binding Person.FirstName}" Width="140" />
-                        <DataGridTextColumn Header="Λόχος / Τμήμα" Binding="{Binding Unit.Name}" Width="150" />
-                        <DataGridTextColumn Header="Ειδικότητα" Binding="{Binding Person.Specialty}" Width="140" />
-                        <DataGridTextColumn Header="Υπηρεσία Σήμερα" Binding="{Binding ServiceDisplayLabel}" Width="*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </TabItem>
+                            <Border Grid.Row="2" Grid.Column="0" Background="#FFFBEB" BorderBrush="#FDE68A" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,4,0">
+                                <StackPanel>
+                                    <TextBlock Text="ΑΠΟΝΤΕΣ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AbsentBrush}" />
+                                    <TextBlock Text="{Binding CurrentSnapshot.TotalAbsent}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AbsentBrush}" />
+                                </StackPanel>
+                            </Border>
 
-            <TabItem Header="🚨 Κατάσταση Απόντων">
-                <DataGrid ItemsSource="{Binding AbsentList}" Margin="0,10,0,0">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Βαθμός" Binding="{Binding Rank.ShortName}" Width="110" />
-                        <DataGridTextColumn Header="Επώνυμο" Binding="{Binding Person.LastName}" Width="160" />
-                        <DataGridTextColumn Header="Όνομα" Binding="{Binding Person.FirstName}" Width="140" />
-                        <DataGridTextColumn Header="Λόχος / Τμήμα" Binding="{Binding Unit.Name}" Width="150" />
-                        <DataGridTextColumn Header="Είδος Απουσίας" Binding="{Binding ActiveStatusType.Name}" Width="160" />
-                        <DataGridTextColumn Header="Από" Binding="{Binding ActiveStatusEvent.StartAt, StringFormat=\{0:dd/MM/yyyy\}}" Width="100" />
-                        <DataGridTextColumn Header="Επιστροφή" Binding="{Binding ReturnDisplayLabel}" Width="110" />
-                        <DataGridTextColumn Header="Διαταγή" Binding="{Binding ActiveStatusEvent.ReferenceDocument}" Width="*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </TabItem>
-        </TabControl>
+                            <Border Grid.Row="2" Grid.Column="1" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="4" Padding="10" Margin="4,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="ΕΠΙΣΤΡΕΦΟΥΝ ΣΗΜΕΡΑ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                    <TextBlock Text="{Binding CurrentSnapshot.ReturningTodayCount}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Separator Background="{StaticResource BorderSubtleBrush}" Margin="0,0,0,12" />
+
+                        <!-- Category Breakdown Table -->
+                        <TextBlock Text="Κατανομή Ανά Κατηγορία Προσωπικού" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Κατηγορία" FontWeight="Bold" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Column="1" Text="Παρόντες" FontWeight="Bold" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" />
+                            <TextBlock Grid.Column="2" Text="Δύναμη" FontWeight="Bold" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+
+                        <!-- Officers/NCOs -->
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Αξιωματικοί / Υπαξιωματικοί" />
+                            <TextBlock Grid.Column="1" Text="{Binding CurrentSnapshot.OfficersAndNcosPresent}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{StaticResource PresentBrush}" />
+                            <TextBlock Grid.Column="2" Text="{Binding CurrentSnapshot.OfficersAndNcosActive}" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                        </Grid>
+
+                        <!-- Conscripts -->
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Οπλίτες Θητείας" />
+                            <TextBlock Grid.Column="1" Text="{Binding CurrentSnapshot.ConscriptsPresent}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{StaticResource PresentBrush}" />
+                            <TextBlock Grid.Column="2" Text="{Binding CurrentSnapshot.ConscriptsActive}" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                        </Grid>
+
+                        <!-- Civilians -->
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Πολιτικό Προσωπικό" />
+                            <TextBlock Grid.Column="1" Text="{Binding CurrentSnapshot.CiviliansPresent}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{StaticResource PresentBrush}" />
+                            <TextBlock Grid.Column="2" Text="{Binding CurrentSnapshot.CiviliansActive}" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Right: Tabbed Nominal Detail Lists -->
+            <Border Grid.Column="2" Style="{StaticResource CardContainer}">
+                <TabControl>
+                    <!-- Absentees Tab -->
+                    <TabItem Header="Ονομαστική Κατάσταση Απόντων">
+                        <Grid Margin="0,10,0,0">
+                            <DataGrid ItemsSource="{Binding CurrentSnapshot.AbsentPersonnel}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Βαθμός" Binding="{Binding Rank.ShortName}" Width="80" />
+                                    <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding Person.FullName}" Width="*" />
+                                    <DataGridTextColumn Header="ΑΣΜ" Binding="{Binding Person.MilitaryServiceNumber}" Width="100" />
+                                    <DataGridTextColumn Header="Λόχος" Binding="{Binding Unit.Name}" Width="110" />
+                                    <DataGridTextColumn Header="Αιτιολογία Απουσίας" Binding="{Binding ActiveStatusType.Name}" Width="140" />
+                                    <DataGridTextColumn Header="Επιστροφή" Binding="{Binding ReturnDisplayLabel}" Width="100" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Present Personnel Tab -->
+                    <TabItem Header="Ονομαστική Κατάσταση Παρόντων">
+                        <Grid Margin="0,10,0,0">
+                            <DataGrid ItemsSource="{Binding CurrentSnapshot.PresentPersonnel}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Βαθμός" Binding="{Binding Rank.ShortName}" Width="80" />
+                                    <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding Person.FullName}" Width="*" />
+                                    <DataGridTextColumn Header="ΑΣΜ" Binding="{Binding Person.MilitaryServiceNumber}" Width="100" />
+                                    <DataGridTextColumn Header="Λόχος" Binding="{Binding Unit.Name}" Width="140" />
+                                    <DataGridTextColumn Header="Κατάσταση" Binding="{Binding StatusDisplayName}" Width="100" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

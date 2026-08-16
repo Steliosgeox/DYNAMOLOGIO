@@ -22,6 +22,19 @@ packages/
 *.log
 %PROGRAMDATA%/
 
+## Operational & Sensitive Data Protection
+*.xlsx
+!templates-reference/Standard_Dynamologio_Template.xlsx
+*.xls
+*.pdf
+*.zip
+!tests/Fixtures/*.zip
+Backups/
+Diagnostics/
+Imports/
+Exports/
+Logs/
+
 ## OS generated files
 Thumbs.db
 ehthumbs.db

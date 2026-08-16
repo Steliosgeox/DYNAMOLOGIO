@@ -53,7 +53,7 @@
 
                     <TextBlock Text="{Binding StatusMessage, FallbackValue='Επιλέξτε αρχείο Excel για προεπισκόπηση.'}" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" VerticalAlignment="Center" />
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="{Binding PreviewReport, Converter={x:Null}}">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="{Binding PreviewReport, Converter={StaticResource NullToVisConverter}}">
                         <Border Background="{StaticResource AccentSubduedBrush}" CornerRadius="4" Padding="8,4" Margin="0,0,6,0">
                             <TextBlock Text="{Binding PreviewReport.NewCount, StringFormat='Νέες: {0}'}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" />
                         </Border>

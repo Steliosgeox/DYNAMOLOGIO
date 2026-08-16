@@ -49,11 +49,21 @@
             <Border Grid.Row="2" Style="{StaticResource CardContainer}" Margin="0,0,0,14">
                 <StackPanel>
                     <TextBlock Text="Αντίγραφα Ασφαλείας &amp; Επαναφορά Δεδομένων" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,10" />
-                    <TextBlock Text="Δημιουργήστε ένα κρυπτογραφικά υπογεγραμμένο ZIP αντίγραφο ασφαλείας (SHA-256) ή επαναφέρετε προηγούμενο αντίγραφο." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12" TextWrapping="Wrap" />
+                    <TextBlock Text="Δημιουργήστε ένα ZIP αντίγραφο ασφαλείας με έλεγχο ακεραιότητας SHA-256 ή επαναφέρετε προηγούμενο πιστοποιημένο αντίγραφο." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12" TextWrapping="Wrap" />
 
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="💾 Δημιουργία Αντιγράφου Ασφαλείας" Command="{Binding CreateBackupCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,10,0" />
-                        <Button Content="⚠️ Επαναφορά από Αντίγραφο" Command="{Binding RestoreBackupCommand}" Style="{StaticResource DangerButton}" Height="34" />
+                        <Button Command="{Binding CreateBackupCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconSaveGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                                <TextBlock Text="Δημιουργία Αντιγράφου Ασφαλείας" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding RestoreBackupCommand}" Style="{StaticResource DangerButton}" Height="34">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                                <TextBlock Text="Επαναφορά από Αντίγραφο" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -64,7 +74,12 @@
                     <TextBlock Text="Τεχνικά Διαγνωστικά" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,10" />
                     <TextBlock Text="Εξαγωγή πακέτου τεχνικών διαγνωστικών για offline υποστήριξη και τεχνικό έλεγχο." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12" />
 
-                    <Button Content="📦 Εξαγωγή Πακέτου Διαγνωστικών" Command="{Binding ExportDiagnosticsCommand}" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Height="34" />
+                    <Button Command="{Binding ExportDiagnosticsCommand}" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Height="34">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconSettingsGeometry}" Fill="{StaticResource TextPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                            <TextBlock Text="Εξαγωγή Πακέτου Διαγνωστικών" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

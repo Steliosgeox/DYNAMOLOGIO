@@ -13,7 +13,7 @@ namespace Dynamologio.Infrastructure.Services
 {
     public interface IAuditService
     {
-        void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = "OPERATOR");
+        void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null);
     }
 
     public class AuditService : IAuditService
@@ -25,11 +25,14 @@ namespace Dynamologio.Infrastructure.Services
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
         }
 
-        public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = "OPERATOR")
+        public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null)
         {
+            string actor = !string.IsNullOrWhiteSpace(username) ? username : Environment.UserName;
+            if (string.IsNullOrWhiteSpace(actor)) actor = "LOCAL_USER";
+
             var audit = new AuditEvent
             {
-                Username = string.IsNullOrWhiteSpace(username) ? "OPERATOR" : username,
+                Username = actor,
                 Action = action,
                 EntityType = entityType ?? string.Empty,
                 EntityId = entityId ?? string.Empty,
@@ -50,16 +53,18 @@ namespace Dynamologio.Infrastructure.Services
         public int SchemaVersion { get; set; } = 1;
         public DateTime Timestamp { get; set; } = DateTime.Now;
         public string DatabaseFileName { get; set; } = "dynamologio.db";
-        public string DatabaseSha256 { get; set; } = string.Empty;
+        public string DatabaseSha256Checksum { get; set; } = string.Empty;
+        public bool IsEncrypted { get; set; } = false;
         public int PersonnelCount { get; set; }
         public int StatusEventsCount { get; set; }
+        public string GeneratedBy { get; set; } = Environment.UserName;
     }
 
     public interface IBackupService
     {
-        BackupManifest CreateBackup(string targetDirectory = null);
+        BackupManifest CreateBackup(string targetDirectory = null, string passphrase = null);
         bool VerifyBackup(string backupZipPath, out BackupManifest manifest, out string errorMessage);
-        void RestoreBackup(string backupZipPath);
+        void RestoreBackup(string backupZipPath, string passphrase = null);
         void PerformDailyAutoBackup();
     }
 
@@ -74,7 +79,7 @@ namespace Dynamologio.Infrastructure.Services
             _dbFilePath = dbFilePath;
         }
 
-        public BackupManifest CreateBackup(string targetDirectory = null)
+        public BackupManifest CreateBackup(string targetDirectory = null, string passphrase = null)
         {
             if (!File.Exists(_dbFilePath))
             {
@@ -95,20 +100,38 @@ namespace Dynamologio.Infrastructure.Services
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string backupZipPath = Path.Combine(targetDirectory, $"Dynamologio_Backup_{timestamp}.zip");
 
-            string sha256 = ComputeSha256(_dbFilePath);
+            // Compute exact SHA-256 checksum of live DB
+            string checksum = ComputeSha256(_dbFilePath);
             var manifest = new BackupManifest
             {
                 Timestamp = DateTime.Now,
-                DatabaseSha256 = sha256,
+                DatabaseSha256Checksum = checksum,
+                IsEncrypted = !string.IsNullOrEmpty(passphrase),
                 PersonnelCount = _uow.Personnel.Count(),
-                StatusEventsCount = _uow.StatusEvents.Count()
+                StatusEventsCount = _uow.StatusEvents.Count(),
+                GeneratedBy = Environment.UserName
             };
 
             using (var zipStream = new FileStream(backupZipPath, FileMode.Create))
             using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
             {
-                archive.CreateEntryFromFile(_dbFilePath, "dynamologio.db", CompressionLevel.Optimal);
+                if (string.IsNullOrEmpty(passphrase))
+                {
+                    archive.CreateEntryFromFile(_dbFilePath, "dynamologio.db", CompressionLevel.Optimal);
+                }
+                else
+                {
+                    // Encrypt DB payload with AES-256 & PBKDF2
+                    byte[] rawDb = File.ReadAllBytes(_dbFilePath);
+                    byte[] encryptedDb = EncryptBytesAes256(rawDb, passphrase);
+                    var dbEntry = archive.CreateEntry("dynamologio.db.enc", CompressionLevel.Optimal);
+                    using (var entryStream = dbEntry.Open())
+                    {
+                        entryStream.Write(encryptedDb, 0, encryptedDb.Length);
+                    }
+                }
 
+                // Add manifest.json
                 var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
                 using (var entryStream = manifestEntry.Open())
                 using (var writer = new StreamWriter(entryStream, Encoding.UTF8))
@@ -136,7 +159,7 @@ namespace Dynamologio.Infrastructure.Services
                 using (var archive = ZipFile.OpenRead(backupZipPath))
                 {
                     var manifestEntry = archive.GetEntry("manifest.json");
-                    var dbEntry = archive.GetEntry("dynamologio.db");
+                    var dbEntry = archive.GetEntry("dynamologio.db") ?? archive.GetEntry("dynamologio.db.enc");
 
                     if (manifestEntry == null || dbEntry == null)
                     {
@@ -150,21 +173,24 @@ namespace Dynamologio.Infrastructure.Services
                         manifest = JsonConvert.DeserializeObject<BackupManifest>(json);
                     }
 
-                    string tempDb = Path.Combine(Path.GetTempPath(), $"verify_{Guid.NewGuid():N}.db");
-                    try
+                    if (!manifest.IsEncrypted)
                     {
-                        dbEntry.ExtractToFile(tempDb, true);
-                        string extractedHash = ComputeSha256(tempDb);
-
-                        if (!string.Equals(extractedHash, manifest.DatabaseSha256, StringComparison.OrdinalIgnoreCase))
+                        string tempDb = Path.Combine(Path.GetTempPath(), $"verify_{Guid.NewGuid():N}.db");
+                        try
                         {
-                            errorMessage = "Αποτυχία επαλήθευσης ακεραιότητας SHA-256.";
-                            return false;
+                            dbEntry.ExtractToFile(tempDb, true);
+                            string extractedHash = ComputeSha256(tempDb);
+
+                            if (!string.Equals(extractedHash, manifest.DatabaseSha256Checksum, StringComparison.OrdinalIgnoreCase))
+                            {
+                                errorMessage = "Αποτυχία επαλήθευσης ακεραιότητας SHA-256. Το αρχείο έχει τροποποιηθεί ή αλλοιωθεί.";
+                                return false;
+                            }
                         }
-                    }
-                    finally
-                    {
-                        if (File.Exists(tempDb)) File.Delete(tempDb);
+                        finally
+                        {
+                            if (File.Exists(tempDb)) File.Delete(tempDb);
+                        }
                     }
                 }
 
@@ -177,25 +203,66 @@ namespace Dynamologio.Infrastructure.Services
             }
         }
 
-        public void RestoreBackup(string backupZipPath)
+        public void RestoreBackup(string backupZipPath, string passphrase = null)
         {
             if (!VerifyBackup(backupZipPath, out var manifest, out var errorMessage))
             {
                 throw new InvalidOperationException($"Αποτυχία επαλήθευσης αντιγράφου: {errorMessage}");
             }
 
-            // 1. Pre-restore safety backup
+            // 1. Create Pre-restore safety snapshot
+            string dbDir = Path.GetDirectoryName(_dbFilePath);
+            string safetyBackup = Path.Combine(dbDir, $"pre_restore_safety_{DateTime.Now:yyyyMMdd_HHmmss}.bak");
             if (File.Exists(_dbFilePath))
             {
-                string safetyBackup = Path.Combine(Path.GetDirectoryName(_dbFilePath), $"pre_restore_safety_{DateTime.Now:yyyyMMdd_HHmmss}.bak");
                 File.Copy(_dbFilePath, safetyBackup, true);
             }
 
-            // 2. Extract restored DB
-            using (var archive = ZipFile.OpenRead(backupZipPath))
+            try
             {
-                var dbEntry = archive.GetEntry("dynamologio.db");
-                dbEntry.ExtractToFile(_dbFilePath, true);
+                // 2. Extract to temp location first
+                string tempExtracted = Path.Combine(Path.GetTempPath(), $"restore_staging_{Guid.NewGuid():N}.db");
+
+                using (var archive = ZipFile.OpenRead(backupZipPath))
+                {
+                    if (manifest.IsEncrypted)
+                    {
+                        var encEntry = archive.GetEntry("dynamologio.db.enc");
+                        if (encEntry == null) throw new InvalidOperationException("Λείπει το κρυπτογραφημένο αρχείο βάσης.");
+
+                        using (var ms = new MemoryStream())
+                        {
+                            using (var es = encEntry.Open()) es.CopyTo(ms);
+                            byte[] decrypted = DecryptBytesAes256(ms.ToArray(), passphrase);
+                            File.WriteAllBytes(tempExtracted, decrypted);
+                        }
+                    }
+                    else
+                    {
+                        var dbEntry = archive.GetEntry("dynamologio.db");
+                        dbEntry.ExtractToFile(tempExtracted, true);
+                    }
+                }
+
+                // 3. Verify SHA-256 of extracted database
+                string extractedChecksum = ComputeSha256(tempExtracted);
+                if (!string.Equals(extractedChecksum, manifest.DatabaseSha256Checksum, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Αποτυχία επαλήθευσης ακεραιότητας SHA-256 κατά την επαναφορά.");
+                }
+
+                // 4. Overwrite live DB
+                File.Copy(tempExtracted, _dbFilePath, true);
+                if (File.Exists(tempExtracted)) File.Delete(tempExtracted);
+            }
+            catch
+            {
+                // Rollback to safety copy if restore failed
+                if (File.Exists(safetyBackup))
+                {
+                    try { File.Copy(safetyBackup, _dbFilePath, true); } catch { }
+                }
+                throw;
             }
         }
 
@@ -240,6 +307,63 @@ namespace Dynamologio.Infrastructure.Services
                 return sb.ToString();
             }
         }
+
+        private static byte[] EncryptBytesAes256(byte[] data, string passphrase)
+        {
+            byte[] salt = new byte[16];
+            using (var rng = new RNGCryptoServiceProvider()) rng.GetBytes(salt);
+
+            using (var keyDerivation = new Rfc2898DeriveBytes(passphrase, salt, 50000))
+            {
+                byte[] key = keyDerivation.GetBytes(32);
+                byte[] iv = keyDerivation.GetBytes(16);
+
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = key;
+                    aes.IV = iv;
+                    using (var ms = new MemoryStream())
+                    {
+                        ms.Write(salt, 0, salt.Length); // Write salt header
+                        using (var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                        {
+                            cs.Write(data, 0, data.Length);
+                            cs.FlushFinalBlock();
+                        }
+                        return ms.ToArray();
+                    }
+                }
+            }
+        }
+
+        private static byte[] DecryptBytesAes256(byte[] encryptedData, string passphrase)
+        {
+            if (string.IsNullOrEmpty(passphrase)) throw new ArgumentException("Απαιτείται συνθηματικό αποκρυπτογράφησης.");
+
+            byte[] salt = new byte[16];
+            Array.Copy(encryptedData, 0, salt, 0, 16);
+
+            using (var keyDerivation = new Rfc2898DeriveBytes(passphrase, salt, 50000))
+            {
+                byte[] key = keyDerivation.GetBytes(32);
+                byte[] iv = keyDerivation.GetBytes(16);
+
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = key;
+                    aes.IV = iv;
+                    using (var ms = new MemoryStream())
+                    {
+                        using (var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write))
+                        {
+                            cs.Write(encryptedData, 16, encryptedData.Length - 16);
+                            cs.FlushFinalBlock();
+                        }
+                        return ms.ToArray();
+                    }
+                }
+            }
+        }
     }
 
     public interface IDiagnosticPackageService
@@ -269,6 +393,7 @@ namespace Dynamologio.Infrastructure.Services
             var diagnosticInfo = new
             {
                 GeneratedAt = DateTime.Now,
+                GeneratedBy = Environment.UserName,
                 OSVersion = Environment.OSVersion.ToString(),
                 Is64BitOperatingSystem = Environment.Is64BitOperatingSystem,
                 Is64BitProcess = Environment.Is64BitProcess,

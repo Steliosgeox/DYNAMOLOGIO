@@ -124,7 +124,7 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Ημ/νία" Binding="{Binding ServiceDate, StringFormat='dd/MM/yy'}" Width="65" />
                                 <DataGridTextColumn Header="Ώρες" Binding="{Binding StartDateTime, StringFormat='HH:mm'}" Width="55" />
-                                <DataGridTextColumn Header="Τοποθεσία" Binding="{Binding Location}" Width="*" />
+                                <DataGridTextColumn Header="Τοποθεσία" Binding="{Binding DutyLocation}" Width="*" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>

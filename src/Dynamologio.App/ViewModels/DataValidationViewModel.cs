@@ -60,6 +60,7 @@ namespace Dynamologio.App.ViewModels
             var events = _uow.StatusEvents.GetAll().ToList();
             var statusTypes = _uow.StatusTypes.GetAll().ToList();
             var services = _uow.ServiceAssignments.GetAll().ToList();
+            var serviceTypes = _uow.ServiceTypes.GetAll().ToDictionary(st => st.Id);
 
             // 1. Scan Personnel Integrity
             foreach (var p in personnel)
@@ -126,6 +127,68 @@ namespace Dynamologio.App.ViewModels
                                 EntityName = p?.FullName ?? "Άγνωστος",
                                 Description = $"Επικάλυψη απουσιών: [{evList[i].StartAt:dd/MM} - {evList[i].EndAtExclusive:dd/MM}] και [{evList[j].StartAt:dd/MM} - {evList[j].EndAtExclusive:dd/MM}].",
                                 ActionRecommendation = "Ακυρώστε ή τροποποιήστε το επικαλυπτόμενο διάστημα."
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 4. Scan Services: Outside Strength & Overlaps & Absences
+            var servicesByPerson = services.Where(s => !s.IsCancelled).GroupBy(s => s.PersonnelId);
+            foreach (var pServices in servicesByPerson)
+            {
+                var p = personnel.FirstOrDefault(x => x.Id == pServices.Key);
+                var sList = pServices.ToList();
+
+                foreach (var s in sList)
+                {
+                    if (p != null)
+                    {
+                        if (s.ServiceDate < p.StrengthStartDate || (p.StrengthEndDate.HasValue && s.ServiceDate >= p.StrengthEndDate.Value))
+                        {
+                            IssuesList.Add(new ValidationIssueItem
+                            {
+                                Severity = ConflictSeverity.Error,
+                                EntityCategory = "Υπηρεσίες",
+                                EntityName = p.FullName,
+                                Description = $"Ανάθεση υπηρεσίας ({s.ServiceDate:dd/MM/yyyy}) εκτός διαστήματος ενεργής δύναμης.",
+                                ActionRecommendation = "Ακυρώστε την ανάθεση υπηρεσίας."
+                            });
+                        }
+
+                        // Check if person has active absence during service
+                        var personAbsences = events.Where(e => !e.IsCancelled && e.PersonnelId == p.Id);
+                        foreach (var ab in personAbsences)
+                        {
+                            if (StatusIntervalMath.IsActiveAt(ab.StartAt, ab.EndAtExclusive, s.StartDateTime))
+                            {
+                                IssuesList.Add(new ValidationIssueItem
+                                {
+                                    Severity = ConflictSeverity.Error,
+                                    EntityCategory = "Υπηρεσίες",
+                                    EntityName = p.FullName,
+                                    Description = $"Ανάθεση υπηρεσίας ({s.ServiceDate:dd/MM/yyyy}) κατά τη διάρκεια ενεργής άδειας/απουσίας [{ab.StartAt:dd/MM} - {ab.EndAtExclusive:dd/MM}].",
+                                    ActionRecommendation = "Ακυρώστε την υπηρεσία ή τροποποιήστε την άδεια."
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Overlapping services
+                for (int i = 0; i < sList.Count; i++)
+                {
+                    for (int j = i + 1; j < sList.Count; j++)
+                    {
+                        if (StatusIntervalMath.DoIntervalsOverlap(sList[i].StartDateTime, sList[i].EndDateTime, sList[j].StartDateTime, sList[j].EndDateTime))
+                        {
+                            IssuesList.Add(new ValidationIssueItem
+                            {
+                                Severity = ConflictSeverity.Error,
+                                EntityCategory = "Υπηρεσίες",
+                                EntityName = p?.FullName ?? "Άγνωστος",
+                                Description = $"Επικάλυψη ωραρίου υπηρεσιών ({sList[i].StartDateTime:dd/MM HH:mm} και {sList[j].StartDateTime:dd/MM HH:mm}).",
+                                ActionRecommendation = "Διορθώστε τις ώρες των αναθέσεων."
                             });
                         }
                     }

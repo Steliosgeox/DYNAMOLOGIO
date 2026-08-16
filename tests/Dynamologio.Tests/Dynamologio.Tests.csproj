@@ -9,6 +9,11 @@
     <AssemblyName>Dynamologio.Tests</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Security" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Dynamologio.Core\Dynamologio.Core.csproj" />
     <ProjectReference Include="..\..\src\Dynamologio.Infrastructure\Dynamologio.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Dynamologio.ImportExport\Dynamologio.ImportExport.csproj" />

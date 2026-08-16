@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
@@ -105,7 +106,6 @@ namespace Dynamologio.Tests
         [Fact]
         public void AT_LIFECYCLE_004_HistoricalQuery_ShouldPreservePastActiveStatus_WhenArchivedToday()
         {
-            // Bug AUD-001 Regression: Archiving today must NOT erase past history
             var engine = new StatusEngine();
             var person = new Personnel
             {
@@ -117,12 +117,10 @@ namespace Dynamologio.Tests
                 IsArchived = true
             };
 
-            // Query on August 20 (Before departure date)
             var snapshotPast = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 20));
             Assert.True(snapshotPast.IsInActiveStrength);
             Assert.Equal(StatusEffect.Present, snapshotPast.EffectiveStatus);
 
-            // Query on September 2 (After departure date)
             var snapshotFuture = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 9, 2));
             Assert.False(snapshotFuture.IsInActiveStrength);
         }
@@ -164,7 +162,6 @@ namespace Dynamologio.Tests
                 EndAtExclusive = new DateTime(2026, 8, 21, 0, 0, 0)
             };
 
-            // On Return Date at midnight (00:00)
             var snapshotReturned = engine.CalculatePersonStatus(person, new[] { ev }, _uow.StatusTypes.GetAll(), null, null, null, null, new DateTime(2026, 8, 21, 0, 0, 0));
             Assert.Equal(StatusEffect.Present, snapshotReturned.EffectiveStatus);
         }
@@ -173,7 +170,7 @@ namespace Dynamologio.Tests
         public void AT_ABS_003_SingleDayAbsence_ShouldHaveCorrectDurationAndReturn()
         {
             var start = new DateTime(2026, 8, 16);
-            var endExclusive = new DateTime(2026, 8, 17); // 1-day absence
+            var endExclusive = new DateTime(2026, 8, 17);
 
             int days = StatusIntervalMath.CalculateDays(start, endExclusive);
             Assert.Equal(1, days);
@@ -205,7 +202,6 @@ namespace Dynamologio.Tests
         [Fact]
         public void AT_ABS_005_ReturningToday_ShouldCountAccuratelyOnReturnDate()
         {
-            // Bug AUD-004 Regression Test
             var statusEngine = new StatusEngine();
             var strengthEngine = new StrengthCalculationEngine(statusEngine);
 
@@ -246,7 +242,6 @@ namespace Dynamologio.Tests
         [Fact]
         public void AT_ABS_006_CivilianPersonnel_ShouldNotCountAsConscript()
         {
-            // Bug AUD-006 Regression Test
             var statusEngine = new StatusEngine();
             var strengthEngine = new StrengthCalculationEngine(statusEngine);
 
@@ -355,8 +350,123 @@ namespace Dynamologio.Tests
         }
 
         // ==========================================
-        // 4. AUDIT & DIAGNOSTICS & BACKUP TESTS
+        // 4. SECURITY & CRYPTOGRAPHY TESTS
         // ==========================================
+
+        [Fact]
+        public void AT_SECURITY_001_EncryptedBackup_ShouldRequireValidPassphrase()
+        {
+            var backupService = new BackupService(_uow, _tempDbPath);
+            var testDir = Path.Combine(Path.GetTempPath(), $"backup_enc_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(testDir);
+
+            try
+            {
+                string passphrase = "SecretPassword2026!";
+                var manifest = backupService.CreateBackup(testDir, passphrase);
+                Assert.True(manifest.IsEncrypted);
+
+                string backupZip = Path.Combine(testDir, $"Dynamologio_Backup_{manifest.Timestamp:yyyyMMdd_HHmmss}.zip");
+                Assert.True(File.Exists(backupZip));
+
+                // Wrong passphrase should throw
+                Assert.ThrowsAny<Exception>(() => backupService.RestoreBackup(backupZip, "WrongPassword"));
+
+                // Correct passphrase restores cleanly
+                backupService.RestoreBackup(backupZip, passphrase);
+            }
+            finally
+            {
+                if (Directory.Exists(testDir)) Directory.Delete(testDir, true);
+            }
+        }
+
+        [Fact]
+        public void AT_SECURITY_002_TamperedBackup_ShouldBeRejected()
+        {
+            var backupService = new BackupService(_uow, _tempDbPath);
+            var testDir = Path.Combine(Path.GetTempPath(), $"backup_tamper_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(testDir);
+
+            try
+            {
+                var manifest = backupService.CreateBackup(testDir);
+                string backupZip = Path.Combine(testDir, $"Dynamologio_Backup_{manifest.Timestamp:yyyyMMdd_HHmmss}.zip");
+
+                // Tamper with the archive by replacing db content
+                string corruptZip = Path.Combine(testDir, "corrupted.zip");
+                using (var archive = System.IO.Compression.ZipFile.Open(backupZip, System.IO.Compression.ZipArchiveMode.Read))
+                using (var destArchive = System.IO.Compression.ZipFile.Open(corruptZip, System.IO.Compression.ZipArchiveMode.Create))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.Name == "dynamologio.db")
+                        {
+                            var newEntry = destArchive.CreateEntry("dynamologio.db");
+                            using (var s = newEntry.Open())
+                            using (var sw = new StreamWriter(s))
+                            {
+                                sw.Write("TAMPERED_CONTENT");
+                            }
+                        }
+                        else
+                        {
+                            var newEntry = destArchive.CreateEntry(entry.FullName);
+                            using (var s = entry.Open())
+                            using (var ds = newEntry.Open())
+                            {
+                                s.CopyTo(ds);
+                            }
+                        }
+                    }
+                }
+
+                Assert.Throws<InvalidOperationException>(() => backupService.RestoreBackup(corruptZip));
+            }
+            finally
+            {
+                if (Directory.Exists(testDir)) Directory.Delete(testDir, true);
+            }
+        }
+
+        // ==========================================
+        // 5. PRODUCTION EMOJI AUTOMATED SCAN TEST
+        // ==========================================
+
+        [Fact]
+        public void AT_REPO_001_ZeroEmojiInProductionSources()
+        {
+            string solutionRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+            string srcDir = Path.Combine(solutionRoot, "src");
+
+            if (!Directory.Exists(srcDir))
+            {
+                // Fallback to searching relative directory
+                srcDir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "src"));
+            }
+
+            if (Directory.Exists(srcDir))
+            {
+                var sourceFiles = Directory.GetFiles(srcDir, "*.*", SearchOption.AllDirectories)
+                    .Where(f => f.EndsWith(".cs") || f.EndsWith(".xaml"))
+                    .ToList();
+
+                var emojiRegex = new Regex(@"[\uD83C-\uDBFF\uDC00-\uDFFF]|[\u2600-\u27BF]", RegexOptions.Compiled);
+                var violations = new List<string>();
+
+                foreach (var file in sourceFiles)
+                {
+                    string content = File.ReadAllText(file);
+                    var matches = emojiRegex.Matches(content);
+                    if (matches.Count > 0)
+                    {
+                        violations.Add($"{Path.GetFileName(file)} contains {matches.Count} emoji characters (e.g. '{matches[0].Value}')");
+                    }
+                }
+
+                Assert.Empty(violations);
+            }
+        }
 
         [Fact]
         public void AT_AUDIT_001_LogAction_ShouldRecordStructuredEvent()
@@ -404,31 +514,6 @@ namespace Dynamologio.Tests
             var doc = reportService.GeneratePrintableDocument(req);
             Assert.NotNull(doc);
             Assert.True(doc.Blocks.Count >= 2);
-        }
-
-        [Fact]
-        public void AT_BACKUP_001_CreateAndRestore_ShouldGuaranteeDataIntegrity()
-        {
-            var backupService = new BackupService(_uow, _tempDbPath);
-            var testDir = Path.Combine(Path.GetTempPath(), $"backup_test_{Guid.NewGuid():N}");
-            Directory.CreateDirectory(testDir);
-
-            try
-            {
-                var manifest = backupService.CreateBackup(testDir);
-                Assert.NotNull(manifest);
-                Assert.NotEmpty(manifest.DatabaseSha256);
-
-                string backupZip = Path.Combine(testDir, $"Dynamologio_Backup_{manifest.Timestamp:yyyyMMdd_HHmmss}.zip");
-                Assert.True(File.Exists(backupZip));
-
-                // Verify restore
-                backupService.RestoreBackup(backupZip);
-            }
-            finally
-            {
-                if (Directory.Exists(testDir)) Directory.Delete(testDir, true);
-            }
         }
     }
 }
