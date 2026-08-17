@@ -49,6 +49,11 @@ namespace Dynamologio.Core.Projections
         }
 
         public string ServiceDisplayLabel => ActiveServiceType != null ? ActiveServiceType.Name : "-";
+        public string FullName => Person?.FullName ?? "-";
+        public string PersonFullName => Person != null ? $"{Rank?.ShortName} {Person.FullName}".Trim() : "-";
+        public string Asm => Person?.MilitaryServiceNumber ?? "-";
+        public string UnitName => Unit?.Name ?? "-";
+        public string RankName => Rank?.ShortName ?? Rank?.Name ?? "-";
     }
 
     /// <summary>

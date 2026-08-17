@@ -556,7 +556,35 @@ namespace Dynamologio.Tests
                 };
 
                 picker.ItemsSource = items;
-                Assert.Equal(2, picker.ItemsSource.Cast<object>().Count());
+
+                // 1. Search by Rank
+                picker.ApplyFilter("Λοχαγός");
+                Assert.Single(picker.FilteredItems);
+                Assert.Equal("ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΛΑΟΣ", picker.FilteredItems[0].DisplayFullName);
+
+                // 2. Search by FullName
+                picker.ApplyFilter("ΓΕΩΡΓΙΟΥ");
+                Assert.Single(picker.FilteredItems);
+                Assert.Equal("67890", picker.FilteredItems[0].DisplayAsm);
+
+                // 3. Search by Unit
+                picker.ApplyFilter("1ος ΛΟΧΟΣ");
+                Assert.Single(picker.FilteredItems);
+                Assert.Equal("12345", picker.FilteredItems[0].DisplayAsm);
+
+                // 4. Search by ASM
+                picker.ApplyFilter("67890");
+                Assert.Single(picker.FilteredItems);
+                Assert.Equal("ΓΕΩΡΓΙΟΥ ΓΕΩΡΓΙΟΣ", picker.FilteredItems[0].DisplayFullName);
+
+                // 5. Search by Specialty
+                picker.ApplyFilter("ΤΕΘΩΡΑΚΙΣΜΕΝΑ");
+                Assert.Single(picker.FilteredItems);
+                Assert.Equal("ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΛΑΟΣ", picker.FilteredItems[0].DisplayFullName);
+
+                // 6. Reset search / Empty query
+                picker.ApplyFilter("");
+                Assert.Equal(2, picker.FilteredItems.Count);
             });
 
             staThread.SetApartmentState(ApartmentState.STA);
@@ -565,7 +593,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void AT_UI_002_FullMainWindow_STA_Rendering_1366x768_and_1024x768()
+        public void ScreenshotCapture_FullMainWindow_1366x768_and_1024x768()
         {
             string current = AppDomain.CurrentDomain.BaseDirectory;
             while (!string.IsNullOrEmpty(current) && !File.Exists(Path.Combine(current, "Dynamologio.sln")))
@@ -575,7 +603,7 @@ namespace Dynamologio.Tests
                 current = parent.FullName;
             }
 
-            string screenshotsDir = Path.Combine(current, "docs", "screenshots", "v5");
+            string screenshotsDir = Path.Combine(current, "docs", "screenshots", "v6");
             if (!Directory.Exists(screenshotsDir)) Directory.CreateDirectory(screenshotsDir);
 
             // Populate rich realistic military demo dataset

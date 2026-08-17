@@ -4,7 +4,7 @@
 
     <Grid x:Name="RootGrid">
         <!-- Main Input Display Box -->
-        <Border x:Name="DisplayBorder" Background="#FFFFFF" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="4" Height="34" Padding="8,2" Cursor="Hand" MouseLeftButtonDown="DisplayBorder_MouseLeftButtonDown">
+        <Border x:Name="DisplayBorder" Background="#FFFFFF" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" CornerRadius="4" Height="34" Padding="10,2" Cursor="Hand" MouseLeftButtonDown="DisplayBorder_MouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -12,17 +12,17 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{StaticResource TextSecondaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="2,0,8,0" VerticalAlignment="Center" />
+                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{StaticResource TextSecondaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
 
                 <TextBlock x:Name="SelectedTextDisplay" Grid.Column="1" Text="Επιλέξτε Στέλεχος / Οπλίτη..." VerticalAlignment="Center" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
 
-                <Path Grid.Column="2" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{StaticResource TextSecondaryBrush}" Margin="6,0,4,0" VerticalAlignment="Center" />
+                <Path Grid.Column="2" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{StaticResource TextSecondaryBrush}" Margin="6,0,2,0" VerticalAlignment="Center" />
             </Grid>
         </Border>
 
         <!-- Dropdown Popup with Live Filter Search -->
         <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=DisplayBorder}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True" Focusable="True">
-            <Border Background="#FFFFFF" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="4" Width="{Binding ActualWidth, ElementName=DisplayBorder}" MaxHeight="300" Margin="0,2,0,0">
+            <Border Background="#FFFFFF" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" CornerRadius="4" Width="{Binding ActualWidth, ElementName=DisplayBorder}" MaxHeight="300" Margin="0,2,0,0">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.15" />
                 </Border.Effect>
@@ -46,8 +46,8 @@
                                     </Grid.ColumnDefinitions>
 
                                     <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                        <TextBlock Text="{Binding DisplayRank}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,6,0" />
-                                        <TextBlock Text="{Binding DisplayFullName}" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding DisplayRank}" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding DisplayFullName}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,6,0" />
                                         <TextBlock Text="{Binding DisplayUnit}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                     <TextBlock Grid.Column="1" Text="{Binding DisplayAsm}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />

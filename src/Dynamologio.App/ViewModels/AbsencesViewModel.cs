@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
+using Dynamologio.App.Controls;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
@@ -45,6 +46,15 @@ namespace Dynamologio.App.ViewModels
 
         public ObservableCollection<StatusType> StatusTypesList { get; } = new ObservableCollection<StatusType>();
         public ObservableCollection<Personnel> PersonnelList { get; } = new ObservableCollection<Personnel>();
+        public ObservableCollection<PersonPickerItem> SearchablePersonnelList { get; } = new ObservableCollection<PersonPickerItem>();
+
+        // Drawer / Modal State
+        private bool _isCreateDrawerOpen;
+        public bool IsCreateDrawerOpen
+        {
+            get => _isCreateDrawerOpen;
+            set => SetProperty(ref _isCreateDrawerOpen, value);
+        }
 
         // Form Fields
         private Personnel _selectedPerson;
@@ -126,6 +136,8 @@ namespace Dynamologio.App.ViewModels
             }
         }
 
+        public ICommand OpenCreateDrawerCommand { get; }
+        public ICommand CloseCreateDrawerCommand { get; }
         public ICommand SaveAbsenceCommand { get; }
         public ICommand CancelAbsenceCommand { get; }
 
@@ -147,24 +159,51 @@ namespace Dynamologio.App.ViewModels
             _startDate = _clock.Today;
             _returnDate = _clock.Today.AddDays(5);
 
+            OpenCreateDrawerCommand = new RelayCommand(_ =>
+            {
+                IsCreateDrawerOpen = true;
+                InlineErrorMessage = string.Empty;
+                InlineSuccessMessage = string.Empty;
+            });
+
+            CloseCreateDrawerCommand = new RelayCommand(_ =>
+            {
+                IsCreateDrawerOpen = false;
+            });
+
             SaveAbsenceCommand = new RelayCommand(SaveAbsence);
             CancelAbsenceCommand = new RelayCommand(param => CancelAbsence(param as AbsencePresentationItem));
         }
 
         public void LoadData()
         {
+            var ranks = _uow.Ranks.GetAll().ToDictionary(r => r.Id);
+            var units = _uow.OrganisationUnits.GetAll().ToDictionary(u => u.Id);
+            var persons = _uow.Personnel.GetAll().ToDictionary(p => p.Id);
+            var stTypes = _uow.StatusTypes.GetAll().ToDictionary(st => st.Id);
+
             StatusTypesList.Clear();
             foreach (var st in _uow.StatusTypes.GetAll().OrderBy(x => x.SortOrder)) StatusTypesList.Add(st);
             if (SelectedStatusType == null) SelectedStatusType = StatusTypesList.FirstOrDefault();
 
             PersonnelList.Clear();
-            foreach (var p in _uow.Personnel.Find(x => !x.IsArchived).OrderBy(x => x.LastName)) PersonnelList.Add(p);
+            SearchablePersonnelList.Clear();
+            foreach (var p in _uow.Personnel.Find(x => !x.IsArchived).OrderBy(x => x.LastName))
+            {
+                PersonnelList.Add(p);
+                ranks.TryGetValue(p.RankId, out var rank);
+                units.TryGetValue(p.OrganisationUnitId, out var unit);
+                SearchablePersonnelList.Add(new PersonPickerItem
+                {
+                    SourceItem = p,
+                    DisplayRank = rank?.ShortName ?? rank?.Name ?? "",
+                    DisplayFullName = p.FullName,
+                    DisplayUnit = unit?.Name ?? p.CompanyOrSection ?? "",
+                    DisplayAsm = p.MilitaryServiceNumber ?? "",
+                    Specialty = p.Specialty ?? ""
+                });
+            }
             if (SelectedPerson == null) SelectedPerson = PersonnelList.FirstOrDefault();
-
-            var ranks = _uow.Ranks.GetAll().ToDictionary(r => r.Id);
-            var units = _uow.OrganisationUnits.GetAll().ToDictionary(u => u.Id);
-            var persons = _uow.Personnel.GetAll().ToDictionary(p => p.Id);
-            var stTypes = _uow.StatusTypes.GetAll().ToDictionary(st => st.Id);
 
             var now = _clock.Now;
             var today = _clock.Today;
@@ -283,6 +322,7 @@ namespace Dynamologio.App.ViewModels
 
             ReferenceDoc = string.Empty;
             Comment = string.Empty;
+            IsCreateDrawerOpen = false;
             LoadData();
         }
 

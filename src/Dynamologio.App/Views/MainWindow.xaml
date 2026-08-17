@@ -41,44 +41,52 @@
             <views:SettingsView />
         </DataTemplate>
 
-        <!-- Navigation RadioButton Style with Visible Cyan Active Indicator Strip -->
-        <Style x:Key="SidebarNavRadioButtonStyle" TargetType="RadioButton">
+        <!-- Modern Sidebar Navigation Item Style -->
+        <Style x:Key="SidebarNavItemStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
-            <Setter Property="Height" Value="42" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+            <Setter Property="Height" Value="38" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="GroupName" Value="SidebarNavGroup" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="navBorder" Background="{TemplateBinding Background}" Padding="10,0">
+                        <ControlTemplate.Resources>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                <Setter Property="FontSize" Value="13" />
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                            </Style>
+                        </ControlTemplate.Resources>
+                        <Border x:Name="navBorder" Background="{TemplateBinding Background}" CornerRadius="4" Margin="6,2" Padding="8,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="4" />
-                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="3" />
+                                    <ColumnDefinition Width="8" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Active 4px Cyan Indicator Strip -->
-                                <Rectangle x:Name="activeIndicator" Grid.Column="0" Fill="#38BDF8" Width="4" Height="26" RadiusX="2" RadiusY="2" Visibility="Collapsed" />
+                                <!-- Active Accent Bar -->
+                                <Rectangle x:Name="activeBar" Grid.Column="0" Fill="{StaticResource NavActiveAccentBrush}" Width="3" Height="20" RadiusX="1.5" RadiusY="1.5" Visibility="Collapsed" />
 
-                                <!-- Content -->
+                                <!-- Icon & Label Content -->
                                 <ContentPresenter Grid.Column="2" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarHoverBrush}" />
+                                <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarItemHoverBrush}" />
                                 <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="activeIndicator" Property="Visibility" Value="Visible" />
-                                <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarActiveBrush}" />
+                                <Setter TargetName="activeBar" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarItemSelectedBrush}" />
                                 <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -89,13 +97,13 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="52" />
+            <RowDefinition Height="44" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="28" />
+            <RowDefinition Height="24" />
         </Grid.RowDefinitions>
 
-        <!-- Top Header Chrome -->
-        <Border Grid.Row="0" Background="{StaticResource HeaderDarkBrush}" Padding="16,0">
+        <!-- 1. Top Institutional Header -->
+        <Border Grid.Row="0" Background="{StaticResource ShellDarkBrush}" Padding="16,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -103,156 +111,159 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- App Brand & Unit Info -->
+                <!-- App Brand & Unit Context -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Path Data="{StaticResource IconAppLogoGeometry}" Fill="{StaticResource AccentPrimaryBrush}" Width="20" Height="20" Stretch="Uniform" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <TextBlock Text="ΔΥΝΑΜΟΛΟΓΙΟ" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
-                    <TextBlock Text=" | " FontSize="14" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="4,0" />
-                    <TextBlock Text="{Binding UnitNameHeader}" FontSize="13" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center" />
-                    <TextBlock Text=" · " FontSize="13" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="2,0" />
-                    <TextBlock Text="{Binding OfficeNameHeader}" FontSize="13" Foreground="#94A3B8" VerticalAlignment="Center" />
+                    <Path Data="{StaticResource IconAppLogoGeometry}" Fill="#38BDF8" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock Text="ΔΥΝΑΜΟΛΟΓΙΟ" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                    <TextBlock Text=" · " FontSize="14" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="6,0" />
+                    <TextBlock Text="{Binding UnitNameHeader}" FontSize="12.5" FontWeight="SemiBold" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                    <TextBlock Text=" · " FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="4,0" />
+                    <TextBlock Text="{Binding OfficeNameHeader}" FontSize="12.5" Foreground="#94A3B8" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- Offline Tag -->
+                <!-- Security / Connection State -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="4" Padding="8,4">
-                        <TextBlock Text="Τοπικός Σταθμός (Air-Gapped)" FontSize="11" Foreground="#94A3B8" />
-                    </Border>
+                    <Ellipse Width="7" Height="7" Fill="#10B981" Margin="0,0,6,0" VerticalAlignment="Center" />
+                    <TextBlock Text="Τοπικός Σταθμός" FontSize="11.5" Foreground="#94A3B8" VerticalAlignment="Center" />
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Main Body: Navigation Sidebar + Content Area -->
+        <!-- 2. Main Body: Compact Navigation Sidebar (180px) + Content Area -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220" MinWidth="180" MaxWidth="260" />
+                <ColumnDefinition Width="180" MinWidth="160" MaxWidth="220" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Navigation Sidebar (Slate Navy) -->
+            <!-- Navigation Sidebar (Graphite) -->
             <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="0,10,0,10">
+                    <StackPanel Margin="0,8,0,8">
                         
-                        <!-- Dashboard Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Dashboard -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Dashboard, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Αρχική" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Αρχική" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Dynamologio Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Dynamologio -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Dynamologio, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Δυναμολόγιο" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Δυναμολόγιο" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Personnel Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Personnel -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Personnel, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Personnel">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Προσωπικό" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Προσωπικό" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Absences Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Absences -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Absences, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Absences">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Απουσίες &amp; Άδειες" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Απουσίες" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Services Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Services -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Services, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Services">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Υπηρεσίες" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Υπηρεσίες" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Reports Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Reports -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Reports, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Reports">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPrintGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Αναφορές &amp; Εξαγωγές" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconPrintGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Αναφορές" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <Separator Background="#334155" Margin="14,10" Height="1" />
+                        <!-- Separator Line -->
+                        <Border Height="1" Background="#1F2937" Margin="12,6,12,6" />
 
-                        <!-- Import Excel Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Import -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=ImportExport, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Εισαγωγή Excel" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Εισαγωγή" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Data Validation Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Validation -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=DataValidation, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Έλεγχος Δεδομένων" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Έλεγχος" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- History Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- History -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=History, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="History">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Ιστορικό (Audit)" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Ιστορικό" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- Settings Nav Item -->
-                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                        <!-- Settings -->
+                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Settings, Mode=OneWay}"
                                      Command="{Binding NavigateCommand}" CommandParameter="Settings">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
-                                <TextBlock Text="Ρυθμίσεις &amp; Backup" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
+                                <TextBlock Text="Ρυθμίσεις" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
+
                     </StackPanel>
                 </ScrollViewer>
             </Border>
 
-            <!-- Dynamic Content Area -->
-            <ContentControl Grid.Column="1" Content="{Binding CurrentViewModel}" />
+            <!-- Working Canvas Container -->
+            <Border Grid.Column="1" Background="{StaticResource CanvasBgBrush}">
+                <ContentControl Content="{Binding CurrentViewModel}" Focusable="False" />
+            </Border>
         </Grid>
 
-        <!-- Status Bar -->
-        <Border Grid.Row="2" Background="#E2E8F0" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="0,1,0,0" Padding="12,0">
-            <Grid VerticalAlignment="Center">
+        <!-- 3. Bottom Status Bar -->
+        <Border Grid.Row="2" Background="#F1F5F9" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="14,0">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0" Text="Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη (DPAPI Encrypted)." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                <TextBlock Grid.Column="1" Text="ΔΥΝΑΜΟΛΟΓΙΟ v1.0.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage, FallbackValue='Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη (DPAPI Encrypted).'}" 
+                           FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="ΔΥΝΑΜΟΛΟΓΙΟ v1.0.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
             </Grid>
         </Border>
     </Grid>

@@ -18,7 +18,7 @@ namespace Dynamologio.App.Controls
         public string DisplayAsm { get; set; } = string.Empty;
         public string Specialty { get; set; } = string.Empty;
 
-        public override string ToString() => $"{DisplayRank} {DisplayFullName} - {DisplayUnit} ({DisplayAsm})";
+        public override string ToString() => $"{DisplayRank} {DisplayFullName} - {DisplayUnit} ({DisplayAsm})".Trim();
     }
 
     public partial class SearchablePersonPicker : UserControl
@@ -41,7 +41,19 @@ namespace Dynamologio.App.Controls
             set => SetValue(SelectedItemProperty, value);
         }
 
-        private List<PersonPickerItem> _allItems = new List<PersonPickerItem>();
+        private readonly List<PersonPickerItem> _allItems = new List<PersonPickerItem>();
+
+        public IReadOnlyList<PersonPickerItem> FilteredItems
+        {
+            get
+            {
+                if (PersonnelListBox?.ItemsSource is IEnumerable<PersonPickerItem> list)
+                {
+                    return list.ToList();
+                }
+                return _allItems;
+            }
+        }
 
         public SearchablePersonPicker()
         {
@@ -57,7 +69,7 @@ namespace Dynamologio.App.Controls
             }
         }
 
-        private void RebuildItemList(IEnumerable rawItems)
+        public void RebuildItemList(IEnumerable rawItems)
         {
             _allItems.Clear();
             if (rawItems == null)
@@ -68,26 +80,29 @@ namespace Dynamologio.App.Controls
 
             foreach (var item in rawItems)
             {
-                if (item is Personnel p)
+                if (item is PersonPickerItem ppi)
+                {
+                    _allItems.Add(ppi);
+                }
+                else if (item is Personnel p)
                 {
                     _allItems.Add(new PersonPickerItem
                     {
                         SourceItem = p,
                         DisplayRank = "",
                         DisplayFullName = p.FullName,
-                        DisplayUnit = "",
+                        DisplayUnit = p.CompanyOrSection ?? "",
                         DisplayAsm = p.MilitaryServiceNumber ?? "",
                         Specialty = p.Specialty ?? ""
                     });
                 }
                 else if (item != null)
                 {
-                    // Generic reflection resolution
                     var t = item.GetType();
-                    string rank = t.GetProperty("RankName")?.GetValue(item)?.ToString() ?? t.GetProperty("Rank")?.GetValue(item)?.ToString() ?? "";
-                    string name = t.GetProperty("FullName")?.GetValue(item)?.ToString() ?? t.GetProperty("Name")?.GetValue(item)?.ToString() ?? item.ToString();
-                    string unit = t.GetProperty("UnitName")?.GetValue(item)?.ToString() ?? t.GetProperty("Unit")?.GetValue(item)?.ToString() ?? "";
-                    string asm = t.GetProperty("MilitaryServiceNumber")?.GetValue(item)?.ToString() ?? t.GetProperty("Asm")?.GetValue(item)?.ToString() ?? "";
+                    string rank = t.GetProperty("RankName")?.GetValue(item)?.ToString() ?? t.GetProperty("Rank")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayRank")?.GetValue(item)?.ToString() ?? "";
+                    string name = t.GetProperty("FullName")?.GetValue(item)?.ToString() ?? t.GetProperty("Name")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayFullName")?.GetValue(item)?.ToString() ?? item.ToString();
+                    string unit = t.GetProperty("UnitName")?.GetValue(item)?.ToString() ?? t.GetProperty("Unit")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayUnit")?.GetValue(item)?.ToString() ?? "";
+                    string asm = t.GetProperty("MilitaryServiceNumber")?.GetValue(item)?.ToString() ?? t.GetProperty("Asm")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayAsm")?.GetValue(item)?.ToString() ?? "";
                     string spec = t.GetProperty("Specialty")?.GetValue(item)?.ToString() ?? "";
 
                     _allItems.Add(new PersonPickerItem
@@ -116,12 +131,12 @@ namespace Dynamologio.App.Controls
                 }
                 else
                 {
-                    var match = picker._allItems.FirstOrDefault(i => ReferenceEquals(i.SourceItem, e.NewValue) || Equals(i.SourceItem, e.NewValue));
+                    var match = picker._allItems.FirstOrDefault(i => ReferenceEquals(i.SourceItem, e.NewValue) || Equals(i.SourceItem, e.NewValue) || ReferenceEquals(i, e.NewValue));
                     if (match != null)
                     {
                         string prefix = !string.IsNullOrEmpty(match.DisplayRank) ? $"[{match.DisplayRank}] " : "";
                         string suffix = !string.IsNullOrEmpty(match.DisplayAsm) ? $" ({match.DisplayAsm})" : "";
-                        picker.SelectedTextDisplay.Text = $"{prefix}{match.DisplayFullName}{suffix}";
+                        picker.SelectedTextDisplay.Text = $"{prefix}{match.DisplayFullName}{suffix}".Trim();
                     }
                     else if (e.NewValue is Personnel p)
                     {
@@ -147,22 +162,30 @@ namespace Dynamologio.App.Controls
             ApplyFilter(FilterTextBox.Text);
         }
 
-        private void ApplyFilter(string query)
+        public void ApplyFilter(string query)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
-                PersonnelListBox.ItemsSource = _allItems;
+                if (PersonnelListBox != null)
+                {
+                    PersonnelListBox.ItemsSource = _allItems;
+                }
             }
             else
             {
                 string s = query.Trim();
                 // 5-dimensional search: Rank, LastName/FullName, Unit, ASM, Specialty
-                PersonnelListBox.ItemsSource = _allItems.Where(item =>
+                var filtered = _allItems.Where(item =>
                     (item.DisplayRank?.IndexOf(s, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
                     (item.DisplayFullName?.IndexOf(s, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
                     (item.DisplayUnit?.IndexOf(s, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
                     (item.DisplayAsm?.IndexOf(s, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
                     (item.Specialty?.IndexOf(s, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0).ToList();
+
+                if (PersonnelListBox != null)
+                {
+                    PersonnelListBox.ItemsSource = filtered;
+                }
             }
         }
 
@@ -170,7 +193,7 @@ namespace Dynamologio.App.Controls
         {
             if (PersonnelListBox.SelectedItem is PersonPickerItem pickerItem)
             {
-                SelectedItem = pickerItem.SourceItem;
+                SelectedItem = pickerItem.SourceItem ?? pickerItem;
                 SearchPopup.IsOpen = false;
             }
         }
@@ -192,7 +215,7 @@ namespace Dynamologio.App.Controls
         {
             if (e.Key == Key.Enter && PersonnelListBox.SelectedItem is PersonPickerItem pickerItem)
             {
-                SelectedItem = pickerItem.SourceItem;
+                SelectedItem = pickerItem.SourceItem ?? pickerItem;
                 SearchPopup.IsOpen = false;
             }
             else if (e.Key == Key.Escape)
