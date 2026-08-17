@@ -199,6 +199,16 @@
                                     <DataGridTextColumn Header="Επιστροφή" Binding="{Binding ReturnDisplayLabel}" Width="100" />
                                 </DataGrid.Columns>
                             </DataGrid>
+
+                            <!-- Empty State Card -->
+                            <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24,18"
+                                    Visibility="{Binding CurrentSnapshot.AbsentPersonnel.Count, Converter={StaticResource InvertedCountToVisConverter}}">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Δεν υπάρχουν καταχωρημένοι απόντες για την επιλεγμένη ημερομηνία." 
+                                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </TabItem>
 
@@ -214,6 +224,16 @@
                                     <DataGridTextColumn Header="Κατάσταση" Binding="{Binding StatusDisplayName}" Width="100" />
                                 </DataGrid.Columns>
                             </DataGrid>
+
+                            <!-- Empty State Card -->
+                            <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24,18"
+                                    Visibility="{Binding CurrentSnapshot.PresentPersonnel.Count, Converter={StaticResource InvertedCountToVisConverter}}">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Δεν υπάρχουν καταχωρημένοι παρόντες για την επιλεγμένη ημερομηνία." 
+                                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </TabItem>
                 </TabControl>
