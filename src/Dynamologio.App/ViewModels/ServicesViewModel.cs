@@ -39,11 +39,11 @@ namespace Dynamologio.App.ViewModels
         private readonly IConfirmationService _confirmationService;
 
         public ObservableCollection<ServicePresentationItem> DailyServicesList { get; } = new ObservableCollection<ServicePresentationItem>();
-        public ObservableCollection<Personnel> PersonnelList { get; } = new ObservableCollection<Personnel>();
+        public ObservableCollection<PersonnelLookupItem> PersonnelList { get; } = new ObservableCollection<PersonnelLookupItem>();
         public ObservableCollection<ServiceType> ServiceTypesList { get; } = new ObservableCollection<ServiceType>();
 
         private DateTime _selectedDate;
-        private Personnel _selectedPerson;
+        private PersonnelLookupItem _selectedPerson;
         private ServiceType _selectedServiceType;
         private string _startTime = "08:00";
         private string _endTime = "14:00";
@@ -63,7 +63,7 @@ namespace Dynamologio.App.ViewModels
             }
         }
 
-        public Personnel SelectedPerson { get => _selectedPerson; set => SetProperty(ref _selectedPerson, value); }
+        public PersonnelLookupItem SelectedPerson { get => _selectedPerson; set => SetProperty(ref _selectedPerson, value); }
         public ServiceType SelectedServiceType { get => _selectedServiceType; set => SetProperty(ref _selectedServiceType, value); }
         public string StartTime { get => _startTime; set => SetProperty(ref _startTime, value); }
         public string EndTime { get => _endTime; set => SetProperty(ref _endTime, value); }
@@ -111,7 +111,7 @@ namespace Dynamologio.App.ViewModels
         public void LoadData()
         {
             PersonnelList.Clear();
-            foreach (var p in _personnelQueryService.GetActivePersonnel().OrderBy(x => x.LastName)) PersonnelList.Add(p);
+            foreach (var p in _personnelQueryService.GetPersonnelLookup()) PersonnelList.Add(p);
             if (SelectedPerson == null) SelectedPerson = PersonnelList.FirstOrDefault();
 
             ServiceTypesList.Clear();
@@ -187,7 +187,7 @@ namespace Dynamologio.App.ViewModels
 
             var existingServices = _personnelQueryService.GetServiceHistory(SelectedPerson.Id);
             var existingAbsences = _absenceQueryService.GetEventsForPerson(SelectedPerson.Id);
-            var conflicts = _conflictEngine.ValidateServiceAssignment(assignment, SelectedPerson, existingServices, existingAbsences);
+            var conflicts = _conflictEngine.ValidateServiceAssignment(assignment, (Personnel)SelectedPerson.OriginalSource, existingServices, existingAbsences);
 
             var error = conflicts.FirstOrDefault(c => c.Severity == ConflictSeverity.Error);
             if (error != null)

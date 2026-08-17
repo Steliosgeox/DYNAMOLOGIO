@@ -80,9 +80,17 @@ namespace Dynamologio.App.Controls
 
             foreach (var item in rawItems)
             {
-                if (item is PersonPickerItem ppi)
+                if (item is PersonnelLookupItem lookup)
                 {
-                    _allItems.Add(ppi);
+                    _allItems.Add(new PersonPickerItem
+                    {
+                        SourceItem = lookup.OriginalSource ?? lookup,
+                        DisplayRank = lookup.RankName ?? "",
+                        DisplayFullName = lookup.FullName ?? "",
+                        DisplayUnit = lookup.UnitName ?? "",
+                        DisplayAsm = lookup.MilitaryServiceNumber ?? "",
+                        Specialty = lookup.Specialty ?? ""
+                    });
                 }
                 else if (item is Personnel p)
                 {
@@ -96,24 +104,13 @@ namespace Dynamologio.App.Controls
                         Specialty = p.Specialty ?? ""
                     });
                 }
-                else if (item != null)
+                else if (item is PersonPickerItem ppi)
                 {
-                    var t = item.GetType();
-                    string rank = t.GetProperty("RankName")?.GetValue(item)?.ToString() ?? t.GetProperty("Rank")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayRank")?.GetValue(item)?.ToString() ?? "";
-                    string name = t.GetProperty("FullName")?.GetValue(item)?.ToString() ?? t.GetProperty("Name")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayFullName")?.GetValue(item)?.ToString() ?? item.ToString();
-                    string unit = t.GetProperty("UnitName")?.GetValue(item)?.ToString() ?? t.GetProperty("Unit")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayUnit")?.GetValue(item)?.ToString() ?? "";
-                    string asm = t.GetProperty("MilitaryServiceNumber")?.GetValue(item)?.ToString() ?? t.GetProperty("Asm")?.GetValue(item)?.ToString() ?? t.GetProperty("DisplayAsm")?.GetValue(item)?.ToString() ?? "";
-                    string spec = t.GetProperty("Specialty")?.GetValue(item)?.ToString() ?? "";
-
-                    _allItems.Add(new PersonPickerItem
-                    {
-                        SourceItem = item,
-                        DisplayRank = rank,
-                        DisplayFullName = name,
-                        DisplayUnit = unit,
-                        DisplayAsm = asm,
-                        Specialty = spec
-                    });
+                    _allItems.Add(ppi);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"SearchablePersonPicker does not support type {item.GetType().Name}. Use PersonnelLookupItem instead.");
                 }
             }
 

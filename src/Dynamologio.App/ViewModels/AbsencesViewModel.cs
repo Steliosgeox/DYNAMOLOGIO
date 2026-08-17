@@ -48,8 +48,7 @@ namespace Dynamologio.App.ViewModels
         public ObservableCollection<AbsencePresentationItem> PastEventsList { get; } = new ObservableCollection<AbsencePresentationItem>();
 
         public ObservableCollection<StatusType> StatusTypesList { get; } = new ObservableCollection<StatusType>();
-        public ObservableCollection<Personnel> PersonnelList { get; } = new ObservableCollection<Personnel>();
-        public ObservableCollection<PersonPickerItem> SearchablePersonnelList { get; } = new ObservableCollection<PersonPickerItem>();
+        public ObservableCollection<PersonnelLookupItem> PersonnelList { get; } = new ObservableCollection<PersonnelLookupItem>();
 
         // Drawer / Modal State
         private bool _isCreateDrawerOpen;
@@ -60,7 +59,7 @@ namespace Dynamologio.App.ViewModels
         }
 
         // Form Fields
-        private Personnel _selectedPerson;
+        private PersonnelLookupItem _selectedPerson;
         private StatusType _selectedStatusType;
         private DateTime _startDate;
         private DateTime _returnDate;
@@ -69,7 +68,7 @@ namespace Dynamologio.App.ViewModels
         private string _inlineErrorMessage = string.Empty;
         private string _inlineSuccessMessage = string.Empty;
 
-        public Personnel SelectedPerson
+        public PersonnelLookupItem SelectedPerson
         {
             get => _selectedPerson;
             set
@@ -197,24 +196,17 @@ namespace Dynamologio.App.ViewModels
             if (SelectedStatusType == null) SelectedStatusType = StatusTypesList.FirstOrDefault();
 
             PersonnelList.Clear();
-            SearchablePersonnelList.Clear();
-            var activePersonnel = _personnelQueryService.GetActivePersonnel().OrderBy(x => x.LastName);
+            var activePersonnel = _personnelQueryService.GetPersonnelLookup();
             var personsDict = new Dictionary<Guid, Personnel>();
-            foreach (var p in activePersonnel)
+            
+            foreach (var lookup in activePersonnel)
             {
-                PersonnelList.Add(p);
-                ranks.TryGetValue(p.RankId, out var rank);
-                units.TryGetValue(p.OrganisationUnitId, out var unit);
-                SearchablePersonnelList.Add(new PersonPickerItem
+                PersonnelList.Add(lookup);
+                var p = lookup.OriginalSource as Personnel;
+                if (p != null)
                 {
-                    SourceItem = p,
-                    DisplayRank = rank?.ShortName ?? rank?.Name ?? "",
-                    DisplayFullName = p.FullName,
-                    DisplayUnit = unit?.Name ?? p.CompanyOrSection ?? "",
-                    DisplayAsm = p.MilitaryServiceNumber ?? "",
-                    Specialty = p.Specialty ?? ""
-                });
-                personsDict[p.Id] = p;
+                    personsDict[p.Id] = p;
+                }
             }
             if (SelectedPerson == null) SelectedPerson = PersonnelList.FirstOrDefault();
 
@@ -300,7 +292,7 @@ namespace Dynamologio.App.ViewModels
             };
 
             var existingEvents = _absenceQueryService.GetEventsForPerson(SelectedPerson.Id);
-            var conflicts = _conflictEngine.ValidateStatusEvent(tempEvent, SelectedPerson, existingEvents, StatusTypesList);
+            var conflicts = _conflictEngine.ValidateStatusEvent(tempEvent, (Personnel)SelectedPerson.OriginalSource, existingEvents, StatusTypesList);
 
             var error = conflicts.FirstOrDefault(c => c.Severity == ConflictSeverity.Error);
             if (error != null)

@@ -20,6 +20,7 @@ namespace Dynamologio.Core.Interfaces
         IEnumerable<Rank> GetAllRanks();
         IEnumerable<OrganisationUnit> GetAllUnits();
         Personnel GetPerson(Guid personId);
+        IEnumerable<PersonnelLookupItem> GetPersonnelLookup();
     }
 
     public interface IAbsenceQueryService

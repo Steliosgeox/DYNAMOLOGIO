@@ -100,6 +100,29 @@ namespace Dynamologio.Infrastructure.Services
         {
             return _uow.Personnel.GetById(personId);
         }
+
+        public IEnumerable<PersonnelLookupItem> GetPersonnelLookup()
+        {
+            var active = GetActivePersonnel();
+            var ranks = GetAllRanks().ToDictionary(r => r.Id);
+            var units = GetAllUnits().ToDictionary(u => u.Id);
+
+            return active.Select(p =>
+            {
+                ranks.TryGetValue(p.RankId, out var r);
+                units.TryGetValue(p.OrganisationUnitId, out var u);
+                return new PersonnelLookupItem
+                {
+                    Id = p.Id,
+                    FullName = p.FullName,
+                    RankName = r?.ShortName ?? r?.Name ?? "",
+                    UnitName = u?.Code ?? u?.Name ?? "",
+                    MilitaryServiceNumber = p.MilitaryServiceNumber ?? "",
+                    Specialty = p.Specialty ?? "",
+                    OriginalSource = p
+                };
+            }).OrderBy(x => x.FullName).ToList();
+        }
     }
 
     public class AbsenceQueryService : IAbsenceQueryService
