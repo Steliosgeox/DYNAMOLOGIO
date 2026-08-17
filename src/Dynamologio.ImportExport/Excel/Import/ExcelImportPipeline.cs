@@ -28,7 +28,7 @@ namespace Dynamologio.ImportExport.Excel.Import
         public string OldValue { get; set; } = string.Empty;
         public string NewValue { get; set; } = string.Empty;
 
-        public string DisplayText => $"{FieldName}: {OldValue} ➔ {NewValue}";
+        public string DisplayText => $"{FieldName}: {OldValue} -> {NewValue}";
     }
 
     public class ImportRowPreview
@@ -87,13 +87,13 @@ namespace Dynamologio.ImportExport.Excel.Import
 
     public interface IExcelImportService
     {
-        ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow);
+        ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow, Dictionary<string, int> customColumnMapping = null);
         ImportBatch CommitImport(ImportPreviewReport previewReport, IUnitOfWork uow, string operatorUsername = "OPERATOR");
     }
 
     public class ExcelImportService : IExcelImportService
     {
-        public ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow)
+        public ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow, Dictionary<string, int> customColumnMapping = null)
         {
             if (!File.Exists(filePath))
             {
@@ -127,7 +127,11 @@ namespace Dynamologio.ImportExport.Excel.Import
                 var headerRow = sheet.GetRow(headerRowIndex);
                 var colMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-                if (headerRow != null)
+                if (customColumnMapping != null && customColumnMapping.Count > 0)
+                {
+                    foreach (var kvp in customColumnMapping) colMap[kvp.Key] = kvp.Value;
+                }
+                else if (headerRow != null)
                 {
                     for (int c = headerRow.FirstCellNum; c < headerRow.LastCellNum; c++)
                     {
@@ -152,9 +156,20 @@ namespace Dynamologio.ImportExport.Excel.Import
                     }
                 }
 
-                if (!colMap.ContainsKey("LASTNAME")) colMap["LASTNAME"] = 2;
-                if (!colMap.ContainsKey("FIRSTNAME")) colMap["FIRSTNAME"] = 3;
-                if (!colMap.ContainsKey("RANK")) colMap["RANK"] = 1;
+                // Verify mandatory column detection
+                bool hasMandatoryColumns = colMap.ContainsKey("LASTNAME") && colMap.ContainsKey("RANK");
+                if (!hasMandatoryColumns)
+                {
+                    var errorRow = new ImportRowPreview
+                    {
+                        RowIndex = 1,
+                        Action = ImportRowAction.ErrorInvalid,
+                        ValidationMessages = new List<string> { "Δεν εντοπίστηκαν οι υποχρεωτικές στήλες 'ΕΠΩΝΥΜΟ' και 'ΒΑΘΜΟΣ' στις κεφαλίδες του Excel. Απαιτείται ρητή αντιστοίχιση στηλών." }
+                    };
+                    report.Rows.Add(errorRow);
+                    report.TotalRows = 1;
+                    return report;
+                }
 
                 int startRow = headerRowIndex + 1;
                 for (int r = startRow; r <= sheet.LastRowNum; r++)
@@ -162,12 +177,12 @@ namespace Dynamologio.ImportExport.Excel.Import
                     var row = sheet.GetRow(r);
                     if (row == null) continue;
 
-                    string lastName = GetCellString(row, colMap.TryGetValue("LASTNAME", out var cLn) ? cLn : 2);
-                    string firstName = GetCellString(row, colMap.TryGetValue("FIRSTNAME", out var cFn) ? cFn : 3);
-                    string rankStr = GetCellString(row, colMap.TryGetValue("RANK", out var cRk) ? cRk : 1);
-                    string asm = GetCellString(row, colMap.TryGetValue("ASM", out var cAsm) ? cAsm : 0);
-                    string unitStr = GetCellString(row, colMap.TryGetValue("UNIT", out var cUn) ? cUn : 4);
-                    string specStr = GetCellString(row, colMap.TryGetValue("SPECIALTY", out var cSp) ? cSp : 5);
+                    string lastName = colMap.TryGetValue("LASTNAME", out var cLn) ? GetCellString(row, cLn) : "";
+                    string firstName = colMap.TryGetValue("FIRSTNAME", out var cFn) ? GetCellString(row, cFn) : "";
+                    string rankStr = colMap.TryGetValue("RANK", out var cRk) ? GetCellString(row, cRk) : "";
+                    string asm = colMap.TryGetValue("ASM", out var cAsm) ? GetCellString(row, cAsm) : "";
+                    string unitStr = colMap.TryGetValue("UNIT", out var cUn) ? GetCellString(row, cUn) : "";
+                    string specStr = colMap.TryGetValue("SPECIALTY", out var cSp) ? GetCellString(row, cSp) : "";
 
                     if (string.IsNullOrWhiteSpace(lastName) && string.IsNullOrWhiteSpace(firstName))
                     {
@@ -201,18 +216,26 @@ namespace Dynamologio.ImportExport.Excel.Import
                     }
 
                     // Validate Unit (NO SILENT DEFAULT GUESSING)
-                    var matchedUnit = allUnits.FirstOrDefault(u =>
-                        string.Equals(u.Name, unitStr, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(u.Code, unitStr, StringComparison.OrdinalIgnoreCase));
-
-                    if (matchedUnit == null && !string.IsNullOrWhiteSpace(unitStr))
+                    if (string.IsNullOrWhiteSpace(unitStr))
                     {
                         rowPreview.Action = ImportRowAction.ErrorInvalid;
-                        rowPreview.ValidationMessages.Add($"Άγνωστη μονάδα/λόχος '{unitStr}'.");
+                        rowPreview.ValidationMessages.Add("Κενή μονάδα/υπομονάδα. Απαιτείται ρητός ορισμός.");
                     }
                     else
                     {
-                        rowPreview.ResolvedUnit = matchedUnit ?? allUnits.FirstOrDefault();
+                        var matchedUnit = allUnits.FirstOrDefault(u =>
+                            string.Equals(u.Name, unitStr, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(u.Code, unitStr, StringComparison.OrdinalIgnoreCase));
+
+                        if (matchedUnit == null)
+                        {
+                            rowPreview.Action = ImportRowAction.ErrorInvalid;
+                            rowPreview.ValidationMessages.Add($"Άγνωστη μονάδα/λόχος '{unitStr}'.");
+                        }
+                        else
+                        {
+                            rowPreview.ResolvedUnit = matchedUnit;
+                        }
                     }
 
                     // Find Existing Person by ASM or Full Name
@@ -250,9 +273,9 @@ namespace Dynamologio.ImportExport.Excel.Import
                                 rowPreview.FieldDiffs.Add(new FieldDiff { FieldName = "Μονάδα", OldValue = existingUnit.Name, NewValue = rowPreview.ResolvedUnit.Name });
                             }
 
-                            if (!string.IsNullOrWhiteSpace(specStr) && !string.Equals(existingPerson.Specialty, specStr, StringComparison.OrdinalIgnoreCase))
+                            if (!string.IsNullOrWhiteSpace(rowPreview.Specialty) && !string.Equals(rowPreview.Specialty, existingPerson.Specialty, StringComparison.OrdinalIgnoreCase))
                             {
-                                rowPreview.FieldDiffs.Add(new FieldDiff { FieldName = "Ειδικότητα", OldValue = existingPerson.Specialty ?? "-", NewValue = specStr });
+                                rowPreview.FieldDiffs.Add(new FieldDiff { FieldName = "Ειδικότητα", OldValue = existingPerson.Specialty ?? "-", NewValue = rowPreview.Specialty });
                             }
 
                             if (rowPreview.FieldDiffs.Count == 0)
@@ -268,15 +291,16 @@ namespace Dynamologio.ImportExport.Excel.Import
 
                     report.Rows.Add(rowPreview);
                 }
+
+                report.TotalRows = report.Rows.Count;
             }
 
-            report.TotalRows = report.Rows.Count;
             return report;
         }
 
         public ImportBatch CommitImport(ImportPreviewReport previewReport, IUnitOfWork uow, string operatorUsername = "OPERATOR")
         {
-            if (previewReport == null || previewReport.Rows.Count == 0)
+            if (previewReport == null || previewReport.Rows == null || previewReport.Rows.Count == 0)
             {
                 throw new InvalidOperationException("Δεν υπάρχουν εγγραφές προς εισαγωγή.");
             }

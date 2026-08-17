@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Core.Projections;
@@ -20,8 +21,15 @@ namespace Dynamologio.App.ViewModels
         private readonly IClock _clock;
         private readonly MainViewModel _mainVM;
 
+        public ObservableCollection<OrganisationUnit> OrganisationUnitsList { get; } = new ObservableCollection<OrganisationUnit>();
+
         private DateTime _selectedDate;
         private OrganisationUnit _selectedUnit;
+        private UnitStrengthSnapshot _currentSnapshot;
+        private string _templateStatusText = "Πρότυπο: Επαληθευμένο";
+        private Brush _templateStatusBrush = new SolidColorBrush(Color.FromRgb(5, 150, 105));
+        private Brush _templateStatusBgBrush = new SolidColorBrush(Color.FromRgb(236, 253, 245));
+        private Brush _templateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(167, 243, 208));
 
         public DateTime SelectedDate
         {
@@ -30,7 +38,7 @@ namespace Dynamologio.App.ViewModels
             {
                 if (SetProperty(ref _selectedDate, value))
                 {
-                    LoadData();
+                    RefreshCalculations();
                 }
             }
         }
@@ -42,17 +50,43 @@ namespace Dynamologio.App.ViewModels
             {
                 if (SetProperty(ref _selectedUnit, value))
                 {
-                    LoadData();
+                    RefreshCalculations();
                 }
             }
         }
 
-        public ObservableCollection<OrganisationUnit> UnitsList { get; } = new ObservableCollection<OrganisationUnit>();
-        public ObservableCollection<PersonnelStatusSnapshot> PresentList { get; } = new ObservableCollection<PersonnelStatusSnapshot>();
-        public ObservableCollection<PersonnelStatusSnapshot> AbsentList { get; } = new ObservableCollection<PersonnelStatusSnapshot>();
+        public UnitStrengthSnapshot CurrentSnapshot
+        {
+            get => _currentSnapshot;
+            set => SetProperty(ref _currentSnapshot, value);
+        }
 
-        public UnitStrengthSnapshot CurrentSnapshot { get; private set; }
+        public string TemplateStatusText
+        {
+            get => _templateStatusText;
+            set => SetProperty(ref _templateStatusText, value);
+        }
 
+        public Brush TemplateStatusBrush
+        {
+            get => _templateStatusBrush;
+            set => SetProperty(ref _templateStatusBrush, value);
+        }
+
+        public Brush TemplateStatusBgBrush
+        {
+            get => _templateStatusBgBrush;
+            set => SetProperty(ref _templateStatusBgBrush, value);
+        }
+
+        public Brush TemplateStatusBorderBrush
+        {
+            get => _templateStatusBorderBrush;
+            set => SetProperty(ref _templateStatusBorderBrush, value);
+        }
+
+        public ICommand SetTodayCommand { get; }
+        public ICommand SetTomorrowCommand { get; }
         public ICommand ExportExcelCommand { get; }
         public ICommand PrintReportCommand { get; }
 
@@ -71,23 +105,56 @@ namespace Dynamologio.App.ViewModels
 
             _selectedDate = _clock.Today;
 
-            ExportExcelCommand = new RelayCommand(ExportExcel);
+            SetTodayCommand = new RelayCommand(_ => SelectedDate = _clock.Today);
+            SetTomorrowCommand = new RelayCommand(_ => SelectedDate = _clock.Today.AddDays(1));
+            ExportExcelCommand = new RelayCommand(ExportToExcel);
             PrintReportCommand = new RelayCommand(PrintReport);
         }
 
         public void LoadData()
         {
-            if (UnitsList.Count == 0)
+            OrganisationUnitsList.Clear();
+            OrganisationUnitsList.Add(new OrganisationUnit { Name = "Όλη η Μονάδα (Συνολικό)", Id = Guid.Empty });
+            foreach (var u in _uow.OrganisationUnits.GetAll().OrderBy(x => x.SortOrder))
             {
-                UnitsList.Add(new OrganisationUnit { Name = "Όλη η Μονάδα (Όλοι οι Λόχοι)", Id = Guid.Empty });
-                foreach (var u in _uow.OrganisationUnits.GetAll().OrderBy(x => x.SortOrder))
-                {
-                    UnitsList.Add(u);
-                }
-                _selectedUnit = UnitsList.First();
+                OrganisationUnitsList.Add(u);
             }
+            if (SelectedUnit == null) SelectedUnit = OrganisationUnitsList.First();
 
-            Guid? filterUnitId = _selectedUnit != null && _selectedUnit.Id != Guid.Empty ? (Guid?)_selectedUnit.Id : null;
+            CheckTemplateStatus();
+            RefreshCalculations();
+        }
+
+        private void CheckTemplateStatus()
+        {
+            var status = _reportService.CheckTemplateStatus(out _, out _, out _);
+            switch (status)
+            {
+                case TemplateVerificationStatus.Verified:
+                    TemplateStatusText = "Πρότυπο: Επαληθευμένο (SHA-256)";
+                    TemplateStatusBrush = new SolidColorBrush(Color.FromRgb(5, 150, 105)); // Green
+                    TemplateStatusBgBrush = new SolidColorBrush(Color.FromRgb(236, 253, 245));
+                    TemplateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(167, 243, 208));
+                    break;
+                case TemplateVerificationStatus.ShaMismatch:
+                    TemplateStatusText = "Πρότυπο: Ασυμφωνία SHA-256";
+                    TemplateStatusBrush = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // Red
+                    TemplateStatusBgBrush = new SolidColorBrush(Color.FromRgb(254, 242, 242));
+                    TemplateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(254, 202, 202));
+                    break;
+                case TemplateVerificationStatus.Missing:
+                default:
+                    TemplateStatusText = "Πρότυπο: Μη Διαθέσιμο";
+                    TemplateStatusBrush = new SolidColorBrush(Color.FromRgb(217, 119, 6)); // Amber
+                    TemplateStatusBgBrush = new SolidColorBrush(Color.FromRgb(255, 251, 235));
+                    TemplateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(253, 230, 138));
+                    break;
+            }
+        }
+
+        private void RefreshCalculations()
+        {
+            Guid? filterUnitId = SelectedUnit != null && SelectedUnit.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null;
 
             var p = _uow.Personnel.GetAll();
             var ev = _uow.StatusEvents.GetAll();
@@ -98,23 +165,9 @@ namespace Dynamologio.App.ViewModels
             var sv = _uow.ServiceTypes.GetAll();
 
             CurrentSnapshot = _strengthCalculator.CalculateSnapshot(p, ev, st, rk, un, sa, sv, SelectedDate, filterUnitId);
-
-            PresentList.Clear();
-            foreach (var item in CurrentSnapshot.PresentPersonnel.OrderBy(x => x.Rank?.SortOrder ?? 99))
-            {
-                PresentList.Add(item);
-            }
-
-            AbsentList.Clear();
-            foreach (var item in CurrentSnapshot.AbsentPersonnel.OrderBy(x => x.Rank?.SortOrder ?? 99))
-            {
-                AbsentList.Add(item);
-            }
-
-            OnPropertyChanged(nameof(CurrentSnapshot));
         }
 
-        private void ExportExcel()
+        private void ExportToExcel()
         {
             try
             {
@@ -128,18 +181,19 @@ namespace Dynamologio.App.ViewModels
                 {
                     var req = new ReportGenerationRequest
                     {
+                        Type = ReportType.DailyDynamologio,
                         AsOfTimestamp = SelectedDate,
-                        OrganisationUnitId = _selectedUnit?.Id != Guid.Empty ? (Guid?)_selectedUnit.Id : null,
-                        UnitTitle = _selectedUnit?.Name ?? "123 ΤΑΓΜΑ ΠΕΖΙΚΟΥ - 1ο ΓΡΑΦΕΙΟ"
+                        OrganisationUnitId = SelectedUnit?.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null,
+                        UnitTitle = _mainVM.UnitNameHeader
                     };
 
                     _reportService.ExportToExcel(req, sfd.FileName);
-                    MessageBox.Show($"Το αρχείο Excel δημιουργήθηκε επιτυχώς:\n{sfd.FileName}", "Εξαγωγή Excel", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show($"Το αρχείο Excel εξήχθη επιτυχώς:\n{sfd.FileName}", "Εξαγωγή Δυναμολογίου", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Σφάλμα εξαγωγής Excel: {ex.Message}", "Σφάλμα Εξαγωγής", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Σφάλμα εξαγωγής: {ex.Message}", "Σφάλμα", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -152,9 +206,10 @@ namespace Dynamologio.App.ViewModels
                 {
                     var req = new ReportGenerationRequest
                     {
+                        Type = ReportType.DailyDynamologio,
                         AsOfTimestamp = SelectedDate,
-                        OrganisationUnitId = _selectedUnit?.Id != Guid.Empty ? (Guid?)_selectedUnit.Id : null,
-                        UnitTitle = _selectedUnit?.Name ?? "123 ΤΑΓΜΑ ΠΕΖΙΚΟΥ - 1ο ΓΡΑΦΕΙΟ"
+                        OrganisationUnitId = SelectedUnit?.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null,
+                        UnitTitle = _mainVM.UnitNameHeader
                     };
 
                     var doc = _reportService.GeneratePrintableDocument(req);
@@ -164,7 +219,7 @@ namespace Dynamologio.App.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Σφάλμα εκτύπωσης: {ex.Message}", "Σφάλμα Εκτύπωσης", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Σφάλμα εκτύπωσης: {ex.Message}", "Σφάλμα", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

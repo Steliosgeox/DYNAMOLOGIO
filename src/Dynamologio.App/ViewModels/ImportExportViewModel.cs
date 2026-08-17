@@ -74,7 +74,7 @@ namespace Dynamologio.App.ViewModels
 
                 if (PreviewReport.ErrorCount > 0)
                 {
-                    StatusMessage = $"⚠️ Εντοπίστηκαν {PreviewReport.ErrorCount} σφάλματα επικύρωσης. Η εισαγωγή είναι μπλοκαρισμένη.";
+                    StatusMessage = $"Εντοπίστηκαν {PreviewReport.ErrorCount} σφάλματα επικύρωσης. Η εισαγωγή είναι μπλοκαρισμένη.";
                 }
                 else
                 {

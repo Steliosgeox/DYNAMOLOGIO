@@ -50,6 +50,11 @@ namespace Dynamologio.App.ViewModels
             ScanDataCommand = new RelayCommand(ScanData);
         }
 
+        public void LoadData()
+        {
+            ScanData();
+        }
+
         public void ScanData()
         {
             IssuesList.Clear();
