@@ -18,6 +18,7 @@ namespace Dynamologio.App.ViewModels
         private readonly IReportGeneratorService _reportService;
         private readonly IExcelImportService _importService;
         private readonly IBackupService _backupService;
+        private readonly IDatabaseLifecycleCoordinator _lifecycleCoordinator;
         private readonly IDiagnosticPackageService _diagnosticService;
         private readonly IAuditService _auditService;
         private readonly IPersonnelService _personnelService;
@@ -27,7 +28,7 @@ namespace Dynamologio.App.ViewModels
 
         private object _currentViewModel;
         private string _activeSection = "Dashboard";
-        private string _unitNameHeader = "123 ΤΑΓΜΑ ΠΕΖΙΚΟΥ";
+        private string _unitNameHeader = "ΜΟΝΑΔΑ";
         private string _officeNameHeader = "1ο ΓΡΑΦΕΙΟ";
 
         public object CurrentViewModel
@@ -75,6 +76,7 @@ namespace Dynamologio.App.ViewModels
             IReportGeneratorService reportService,
             IExcelImportService importService,
             IBackupService backupService,
+            IDatabaseLifecycleCoordinator lifecycleCoordinator,
             IDiagnosticPackageService diagnosticService,
             IAuditService auditService,
             IClock clock,
@@ -89,6 +91,7 @@ namespace Dynamologio.App.ViewModels
             _reportService = reportService ?? throw new ArgumentNullException(nameof(reportService));
             _importService = importService ?? throw new ArgumentNullException(nameof(importService));
             _backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
+            _lifecycleCoordinator = lifecycleCoordinator;
             _diagnosticService = diagnosticService ?? throw new ArgumentNullException(nameof(diagnosticService));
             _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
             _clock = clock ?? SystemClock.Instance;
@@ -106,7 +109,7 @@ namespace Dynamologio.App.ViewModels
             ImportExportVM = new ImportExportViewModel(_uow, _importService, this);
             HistoryVM = new HistoryViewModel(_uow, _clock, this);
             DataValidationVM = new DataValidationViewModel(_uow, _conflictEngine, _statusEngine, _clock, this);
-            SettingsVM = new SettingsViewModel(_uow, _backupService, _diagnosticService, _clock, this);
+            SettingsVM = new SettingsViewModel(_uow, _backupService, _lifecycleCoordinator, _diagnosticService, _clock, this);
 
             NavigateCommand = new RelayCommand(param => Navigate(param as string));
 
@@ -129,6 +132,20 @@ namespace Dynamologio.App.ViewModels
         public void RefreshCurrentView()
         {
             Navigate(ActiveSection);
+        }
+
+        public void RefreshAllViewModels()
+        {
+            DashboardVM.LoadData();
+            DynamologioVM.LoadData();
+            PersonnelVM.LoadData();
+            AbsencesVM.LoadData();
+            ServicesVM.LoadData();
+            ReportsVM.LoadData();
+            DataValidationVM.LoadData();
+            HistoryVM.LoadData();
+            SettingsVM.LoadData();
+            RefreshCurrentView();
         }
 
         public void Navigate(string section)

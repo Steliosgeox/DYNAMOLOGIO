@@ -67,4 +67,25 @@ namespace Dynamologio.App.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class CountToVisibilityConverter : IValueConverter
+    {
+        public bool Invert { get; set; } = false;
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            int count = 0;
+            if (value is int i) count = i;
+            else if (value != null && int.TryParse(value.ToString(), out int parsed)) count = parsed;
+
+            bool isVisible = count > 0;
+            if (Invert) isVisible = !isVisible;
+            return isVisible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

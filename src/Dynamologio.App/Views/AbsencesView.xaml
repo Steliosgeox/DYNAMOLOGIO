@@ -12,29 +12,16 @@
 
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0">
+            <StackPanel>
                 <TextBlock Text="Διαχείριση Απουσιών &amp; Αδειών" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
                 <TextBlock Text="Καταχώρηση αδειών, αναρρωτικών, αποσπάσεων και αυτόματος υπολογισμός ημερομηνιών επιστροφής" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
-            </StackPanel>
-
-            <!-- Date Selector -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Ημερομηνία Αναφοράς:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <DatePicker SelectedDate="{Binding SelectedDate}" Width="130" Margin="0,0,6,0" />
-                <Button Content="Σήμερα" Command="{Binding SetTodayCommand}" Style="{StaticResource SecondaryButton}" Height="30" Margin="0,0,4,0" />
-                <Button Content="Αύριο" Command="{Binding SetTomorrowCommand}" Style="{StaticResource SecondaryButton}" Height="30" />
             </StackPanel>
         </Grid>
 
         <!-- Main Body: Entry Form + Segmented Lists -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="380" MinWidth="340" MaxWidth="440" />
+                <ColumnDefinition Width="320" MinWidth="280" MaxWidth="380" />
                 <ColumnDefinition Width="14" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
@@ -62,34 +49,36 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Έναρξη (Inclusive) *" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <TextBlock Text="Έναρξη *" FontWeight="SemiBold" Margin="0,0,0,4" />
                                 <DatePicker SelectedDate="{Binding StartDate}" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Επιστροφή (Exclusive) *" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <TextBlock Text="Επιστροφή *" FontWeight="SemiBold" Margin="0,0,0,4" />
                                 <DatePicker SelectedDate="{Binding ReturnDate}" />
                             </StackPanel>
                         </Grid>
 
                         <!-- Live Calculation Summary Pill -->
                         <Border Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
-                            <TextBlock Text="{Binding IntervalSummaryText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding ComputedSummaryText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}" TextWrapping="Wrap" />
                         </Border>
 
                         <!-- Reference Document -->
                         <TextBlock Text="Αριθμός Διαταγής / Έγκρισης" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding ReferenceDocument}" Height="32" Margin="0,0,0,10" />
+                        <TextBox Text="{Binding ReferenceDoc, UpdateSourceTrigger=PropertyChanged}" Height="32" Margin="0,0,0,10" />
 
                         <!-- Comments -->
                         <TextBlock Text="Αιτιολογία / Παρατηρήσεις" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding Comment}" Height="54" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,12" />
+                        <TextBox Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}" Height="50" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,12" />
 
-                        <!-- Inline Error Feedback -->
-                        <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisConverter}}" />
+                        <!-- Feedback Messages -->
+                        <TextBlock Text="{Binding InlineErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Visibility="{Binding InlineErrorMessage, Converter={StaticResource StringToVisConverter}}" />
+                        <TextBlock Text="{Binding InlineSuccessMessage}" Foreground="{StaticResource SuccessBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Visibility="{Binding InlineSuccessMessage, Converter={StaticResource StringToVisConverter}}" />
 
-                        <Button Content="Καταχώρηση Απουσίας" Command="{Binding CreateAbsenceCommand}" Style="{StaticResource PrimaryButton}" Height="36" />
+                        <Button Content="Καταχώρηση Απουσίας" Command="{Binding SaveAbsenceCommand}" Style="{StaticResource PrimaryButton}" Height="36" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -100,14 +89,15 @@
                     <!-- Active Absences Today -->
                     <TabItem Header="Ενεργές Σήμερα">
                         <Grid Margin="0,10,0,0">
-                            <DataGrid ItemsSource="{Binding ActiveTodayAbsences}">
+                            <DataGrid ItemsSource="{Binding ActiveEventsList}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="80" />
                                     <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding PersonName}" Width="*" />
+                                    <DataGridTextColumn Header="Υπομονάδα" Binding="{Binding UnitName}" Width="110" />
                                     <DataGridTextColumn Header="Είδος Απουσίας" Binding="{Binding StatusTypeName}" Width="130" />
                                     <DataGridTextColumn Header="Έναρξη" Binding="{Binding StartAt, StringFormat='dd/MM/yyyy'}" Width="95" />
                                     <DataGridTextColumn Header="Επιστροφή" Binding="{Binding EndAtExclusive, StringFormat='dd/MM/yyyy'}" Width="95" />
-                                    <DataGridTextColumn Header="Διαταγή" Binding="{Binding Event.ReferenceDocument}" Width="110" />
+                                    <DataGridTextColumn Header="Διαταγή" Binding="{Binding ReferenceDoc}" Width="110" />
                                     <DataGridTemplateColumn Header="Ενέργεια" Width="80">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -117,20 +107,30 @@
                                     </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
+
+                            <!-- Empty State Overlay -->
+                            <Border Style="{StaticResource EmptyStateCard}" Visibility="{Binding ActiveEventsList.Count, Converter={StaticResource InvertedCountToVisConverter}}">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{StaticResource TextSecondaryBrush}" Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                                    <TextBlock Text="Δεν υπάρχουν ενεργές απουσίες για σήμερα." FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Όλο το καταγεγραμμένο προσωπικό βρίσκεται εντός μονάδας." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </TabItem>
 
                     <!-- Planned Future Absences -->
                     <TabItem Header="Προγραμματισμένες">
                         <Grid Margin="0,10,0,0">
-                            <DataGrid ItemsSource="{Binding PlannedFutureAbsences}">
+                            <DataGrid ItemsSource="{Binding PlannedEventsList}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="80" />
                                     <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding PersonName}" Width="*" />
+                                    <DataGridTextColumn Header="Υπομονάδα" Binding="{Binding UnitName}" Width="110" />
                                     <DataGridTextColumn Header="Είδος Απουσίας" Binding="{Binding StatusTypeName}" Width="130" />
                                     <DataGridTextColumn Header="Έναρξη" Binding="{Binding StartAt, StringFormat='dd/MM/yyyy'}" Width="95" />
                                     <DataGridTextColumn Header="Επιστροφή" Binding="{Binding EndAtExclusive, StringFormat='dd/MM/yyyy'}" Width="95" />
-                                    <DataGridTextColumn Header="Διαταγή" Binding="{Binding Event.ReferenceDocument}" Width="110" />
+                                    <DataGridTextColumn Header="Διαταγή" Binding="{Binding ReferenceDoc}" Width="110" />
                                     <DataGridTemplateColumn Header="Ενέργεια" Width="80">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -140,22 +140,39 @@
                                     </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
+
+                            <!-- Empty State Overlay -->
+                            <Border Style="{StaticResource EmptyStateCard}" Visibility="{Binding PlannedEventsList.Count, Converter={StaticResource InvertedCountToVisConverter}}">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{StaticResource TextSecondaryBrush}" Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                                    <TextBlock Text="Δεν υπάρχουν μελλοντικές προγραμματισμένες απουσίες." FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </TabItem>
 
                     <!-- Past Absences History -->
                     <TabItem Header="Ιστορικό">
                         <Grid Margin="0,10,0,0">
-                            <DataGrid ItemsSource="{Binding PastAbsences}">
+                            <DataGrid ItemsSource="{Binding PastEventsList}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="80" />
                                     <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding PersonName}" Width="*" />
+                                    <DataGridTextColumn Header="Υπομονάδα" Binding="{Binding UnitName}" Width="110" />
                                     <DataGridTextColumn Header="Είδος Απουσίας" Binding="{Binding StatusTypeName}" Width="130" />
                                     <DataGridTextColumn Header="Έναρξη" Binding="{Binding StartAt, StringFormat='dd/MM/yyyy'}" Width="95" />
                                     <DataGridTextColumn Header="Επιστροφή" Binding="{Binding EndAtExclusive, StringFormat='dd/MM/yyyy'}" Width="95" />
-                                    <DataGridTextColumn Header="Κατάσταση" Binding="{Binding StatusBadge}" Width="100" />
+                                    <DataGridTextColumn Header="Διαταγή" Binding="{Binding ReferenceDoc}" Width="110" />
                                 </DataGrid.Columns>
                             </DataGrid>
+
+                            <!-- Empty State Overlay -->
+                            <Border Style="{StaticResource EmptyStateCard}" Visibility="{Binding PastEventsList.Count, Converter={StaticResource InvertedCountToVisConverter}}">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource IconHistoryGeometry}" Fill="{StaticResource TextSecondaryBrush}" Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                                    <TextBlock Text="Δεν υπάρχει προηγούμενο ιστορικό απουσιών." FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </TabItem>
                 </TabControl>
