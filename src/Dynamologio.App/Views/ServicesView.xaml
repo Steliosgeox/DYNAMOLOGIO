@@ -1,6 +1,7 @@
 <UserControl x:Class="Dynamologio.App.Views.ServicesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctrl="clr-namespace:Dynamologio.App.Controls"
              Background="{StaticResource CanvasBgBrush}">
 
     <Grid Margin="16">
@@ -46,7 +47,7 @@
 
                         <!-- Person Selector -->
                         <TextBlock Text="Στέλεχος / Οπλίτης *" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <ComboBox ItemsSource="{Binding ActivePersonnelList}" SelectedItem="{Binding SelectedPerson}" DisplayMemberPath="DisplayName" Height="32" Margin="0,0,0,10" />
+                        <ctrl:SearchablePersonPicker ItemsSource="{Binding PersonnelList}" SelectedItem="{Binding SelectedPerson, Mode=TwoWay}" Margin="0,0,0,10" />
 
                         <!-- Service Type -->
                         <TextBlock Text="Είδος Υπηρεσίας *" FontWeight="SemiBold" Margin="0,0,0,4" />

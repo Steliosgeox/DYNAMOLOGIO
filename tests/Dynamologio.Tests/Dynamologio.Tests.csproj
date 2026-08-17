@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Dynamologio.Infrastructure\Dynamologio.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Dynamologio.ImportExport\Dynamologio.ImportExport.csproj" />
     <ProjectReference Include="..\..\src\Dynamologio.Reporting\Dynamologio.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\Dynamologio.App\Dynamologio.App.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />

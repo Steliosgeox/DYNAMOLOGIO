@@ -59,6 +59,12 @@
     <!-- Cross / Cancel / Error -->
     <Geometry x:Key="IconCloseGeometry">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</Geometry>
 
+    <!-- Save / Disk -->
+    <Geometry x:Key="IconSaveGeometry">M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z</Geometry>
+
+    <!-- Cancel / Back -->
+    <Geometry x:Key="IconCancelGeometry">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</Geometry>
+
     <!-- Application Logo Mark (Hellenic Δ Workstation Vector) -->
     <Geometry x:Key="IconAppLogoGeometry">M12,2L1,22H23L12,2M12,6.5L18.5,19H5.5L12,6.5M8.5,15H15.5V17H8.5V15Z</Geometry>
 

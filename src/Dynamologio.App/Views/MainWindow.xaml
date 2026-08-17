@@ -41,8 +41,8 @@
             <views:SettingsView />
         </DataTemplate>
 
-        <!-- Navigation Button Style with Active Selection Triggers -->
-        <Style x:Key="SidebarNavButtonStyle" TargetType="Button">
+        <!-- Navigation RadioButton Style with Visible Cyan Active Indicator Strip -->
+        <Style x:Key="SidebarNavRadioButtonStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
             <Setter Property="Height" Value="42" />
@@ -51,10 +51,11 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="GroupName" Value="SidebarNavGroup" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="navBorder" Background="{TemplateBinding Background}" Padding="12,0">
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="navBorder" Background="{TemplateBinding Background}" Padding="10,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="4" />
@@ -62,8 +63,8 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Active Indicator Strip -->
-                                <Rectangle x:Name="activeIndicator" Grid.Column="0" Fill="#38BDF8" Width="4" RadiusX="2" RadiusY="2" Visibility="Collapsed" />
+                                <!-- Active 4px Cyan Indicator Strip -->
+                                <Rectangle x:Name="activeIndicator" Grid.Column="0" Fill="#38BDF8" Width="4" Height="26" RadiusX="2" RadiusY="2" Visibility="Collapsed" />
 
                                 <!-- Content -->
                                 <ContentPresenter Grid.Column="2" VerticalAlignment="Center" />
@@ -72,6 +73,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarHoverBrush}" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="activeIndicator" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="navBorder" Property="Background" Value="{StaticResource SidebarActiveBrush}" />
                                 <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -129,186 +135,106 @@
                     <StackPanel Margin="0,10,0,10">
                         
                         <!-- Dashboard Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Dashboard, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Αρχική" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Dashboard">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Dynamologio Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Dynamologio, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Δυναμολόγιο" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Dynamologio">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Personnel Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Personnel">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Personnel, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Personnel">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Προσωπικό" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Personnel">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Absences Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Absences">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Absences, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Absences">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Απουσίες &amp; Άδειες" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Absences">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Services Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Services">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Services, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Services">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Υπηρεσίες" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Services">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Reports Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Reports">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Reports, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Reports">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPrintGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconPrintGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Αναφορές &amp; Εξαγωγές" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Reports">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <Separator Background="#334155" Margin="14,10" Height="1" />
 
                         <!-- Import Excel Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=ImportExport, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Εισαγωγή Excel" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="ImportExport">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Data Validation Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=DataValidation, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Έλεγχος Δεδομένων" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="DataValidation">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- History Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="History">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=History, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="History">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Ιστορικό (Audit)" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="History">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
 
                         <!-- Settings Nav Item -->
-                        <Button Command="{Binding NavigateCommand}" CommandParameter="Settings">
+                        <RadioButton Style="{StaticResource SidebarNavRadioButtonStyle}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Settings, Mode=OneWay}"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Settings">
                             <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
+                                <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,12,0" />
                                 <TextBlock Text="Ρυθμίσεις &amp; Backup" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ActiveSection}" Value="Settings">
-                                            <Setter Property="Background" Value="{StaticResource SidebarActiveBrush}" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        </RadioButton>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -325,7 +251,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη (DPAPI Protected)." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                <TextBlock Grid.Column="0" Text="Σύστημα έτοιμο. Βάση δεδομένων: LiteDB 5.x Ενσωματωμένη (DPAPI Encrypted)." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <TextBlock Grid.Column="1" Text="ΔΥΝΑΜΟΛΟΓΙΟ v1.0.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
             </Grid>
         </Border>

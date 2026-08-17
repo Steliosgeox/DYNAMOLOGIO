@@ -10,6 +10,7 @@
     <converters:StringToVisibilityConverter x:Key="StringToVisConverter" />
     <converters:NullToVisibilityConverter x:Key="NullToVisConverter" />
     <converters:EqualityToVisibilityConverter x:Key="EqToVisConverter" />
+    <converters:EqualityToBoolConverter x:Key="EqToBoolConverter" />
 
     <!-- Color Palette Tokens -->
     <Color x:Key="HeaderDarkColor">#0F172A</Color>
@@ -187,18 +188,85 @@
         </Setter>
     </Style>
 
-    <!-- Custom Styled ComboBox -->
+    <!-- Custom Styled ComboBox with Complete ControlTemplate -->
+    <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="28" />
+            </Grid.ColumnDefinitions>
+            <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="#FFFFFF" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" />
+            <Path x:Name="Arrow" Grid.Column="1" Fill="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" />
+        </Grid>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}" />
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
     <Style TargetType="ComboBox">
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Height" Value="32" />
+        <Setter Property="Background" Value="#FFFFFF" />
         <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Background" Value="#FFFFFF" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton Name="ToggleButton" Template="{StaticResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" />
+                        <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,3,30,3" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                        <TextBox x:Name="PART_EditableTextBox" Style="{x:Null}" Template="{DynamicResource ComboBoxTextBox}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,3,23,3" Focusable="True" Background="Transparent" Visibility="Hidden" IsReadOnly="{TemplateBinding IsReadOnly}" />
+                        <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                            <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <Border x:Name="DropDownBorder" Background="#FFFFFF" BorderThickness="1" BorderBrush="{StaticResource BorderStrongBrush}" CornerRadius="4" Margin="0,2,0,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.12" />
+                                    </Border.Effect>
+                                    <ScrollViewer Margin="4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    <!-- Custom Styled DatePicker -->
+    <Style TargetType="ComboBoxItem">
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="itemBorder" Background="Transparent" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="itemBorder" Property="Background" Value="#F1F5F9" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="itemBorder" Property="Background" Value="{StaticResource SoftIndigoBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource AccentPrimaryBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Custom Styled DatePicker with Complete ControlTemplate -->
     <Style TargetType="DatePicker">
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Height" Value="32" />
