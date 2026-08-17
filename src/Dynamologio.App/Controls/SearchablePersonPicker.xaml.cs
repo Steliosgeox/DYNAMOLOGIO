@@ -84,7 +84,7 @@ namespace Dynamologio.App.Controls
                 {
                     _allItems.Add(new PersonPickerItem
                     {
-                        SourceItem = lookup.OriginalSource ?? lookup,
+                        SourceItem = lookup,
                         DisplayRank = lookup.RankName ?? "",
                         DisplayFullName = lookup.FullName ?? "",
                         DisplayUnit = lookup.UnitName ?? "",

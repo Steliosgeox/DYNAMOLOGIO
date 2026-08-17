@@ -107,10 +107,10 @@ namespace Dynamologio.Tests
 
     public class DynamologioTests : IDisposable
     {
-        private readonly string _tempDbPath;
-        private readonly LiteDbContext _dbContext;
-        private readonly LiteDbUnitOfWork _uow;
-        private readonly IClock _clock;
+        protected readonly string _tempDbPath;
+        protected readonly LiteDbContext _dbContext;
+        protected readonly LiteDbUnitOfWork _uow;
+        protected readonly IClock _clock;
 
         public DynamologioTests()
         {
@@ -363,98 +363,6 @@ namespace Dynamologio.Tests
         }
 
         // ==========================================
-        // 2. TRANSACTIONAL DOMAIN & AUDIT TESTS
-        // ==========================================
-
-        [Fact]
-        public void AT_TX_001_AuditFailureRollback_ForPersonnel()
-        {
-            var failingAudit = new FailingAuditPublisher();
-            var actor = new TestCurrentActor();
-            var tx = new LiteDbTransactionRunner(_uow);
-            var svc = new PersonnelService(_uow, failingAudit, tx, _clock, actor);
-
-            var rk = new Rank { Name = "Λγος", Category = PersonnelCategory.OfficerOrNco };
-            var un = new OrganisationUnit { Name = "ΛΧ" };
-            _uow.Ranks.Insert(rk);
-            _uow.OrganisationUnits.Insert(un);
-
-            var person = new Personnel 
-            { 
-                LastName = "ΔΟΚΙΜΗ", 
-                FirstName = "ΑΠΟΤΥΧΙΑΣ",
-                MilitaryServiceNumber = "12345",
-                RankId = rk.Id,
-                OrganisationUnitId = un.Id,
-                Category = PersonnelCategory.OfficerOrNco
-            };
-
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                svc.CreatePerson(person, "Δοκιμή");
-            });
-
-            Assert.Empty(_uow.Personnel.GetAll());
-            Assert.Empty(_uow.AuditEvents.GetAll());
-        }
-
-        [Fact]
-        public void AT_TX_002_AuditFailureRollback_ForAbsence()
-        {
-            var failingAudit = new FailingAuditPublisher();
-            var actor = new TestCurrentActor();
-            var tx = new LiteDbTransactionRunner(_uow);
-            var svc = new AbsenceService(_uow, failingAudit, tx, _clock, actor);
-
-            var p = new Personnel { LastName = "Δ", FirstName = "Α", MilitaryServiceNumber = "1", RankId = Guid.NewGuid(), OrganisationUnitId = Guid.NewGuid() };
-            _uow.Personnel.Insert(p);
-            var st = new StatusType { Name = "ΚΑ", Effect = StatusEffect.Absent };
-            _uow.StatusTypes.Insert(st);
-
-            var ev = new StatusEvent { PersonnelId = p.Id, StatusTypeId = st.Id, StartAt = DateTime.Today, EndAtExclusive = DateTime.Today.AddDays(3) };
-
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                svc.CreateAbsence(ev, "Δοκιμή");
-            });
-
-            Assert.Empty(_uow.StatusEvents.GetAll());
-            Assert.Empty(_uow.AuditEvents.GetAll());
-        }
-
-        [Fact]
-        public void AT_TX_003_AuditFailureRollback_ForService()
-        {
-            var failingAudit = new FailingAuditPublisher();
-            var actor = new TestCurrentActor();
-            var tx = new LiteDbTransactionRunner(_uow);
-            var svc = new DutyService(_uow, failingAudit, tx, _clock, actor);
-
-            var p = new Personnel { LastName = "Δ", FirstName = "Α", MilitaryServiceNumber = "1", RankId = Guid.NewGuid(), OrganisationUnitId = Guid.NewGuid() };
-            _uow.Personnel.Insert(p);
-            var sv = new ServiceType { Name = "ΑΥ" };
-            _uow.ServiceTypes.Insert(sv);
-
-            var duty = new ServiceAssignment
-            {
-                PersonnelId = p.Id,
-                ServiceTypeId = sv.Id,
-                ServiceDate = DateTime.Today,
-                StartDateTime = DateTime.Today.AddHours(8),
-                EndDateTime = DateTime.Today.AddHours(16),
-                DutyLocation = "Διοικητήριο"
-            };
-
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                svc.AssignDuty(duty, "Δοκιμή");
-            });
-
-            Assert.Empty(_uow.ServiceAssignments.GetAll());
-            Assert.Empty(_uow.AuditEvents.GetAll());
-        }
-
-        // ==========================================
         // 3. IMPORT & AMBIGUITY RESOLUTION TESTS
         // ==========================================
 
@@ -601,58 +509,7 @@ namespace Dynamologio.Tests
             Directory.Delete(outDir, true);
         }
 
-        // ==========================================
-        // 5. UI BEHAVIOR & FULL MAINWINDOW SCREENSHOTS
-        // ==========================================
 
-        [Fact]
-        public void AT_UI_001_SearchablePersonPicker_SearchesAllFiveDimensions()
-        {
-            var staThread = new Thread(() =>
-            {
-                var picker = new SearchablePersonPicker();
-                var items = new List<PersonPickerItem>
-                {
-                    new PersonPickerItem { DisplayRank = "Λοχαγός", DisplayFullName = "ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΛΑΟΣ", DisplayUnit = "1ος ΛΟΧΟΣ", DisplayAsm = "12345", Specialty = "ΤΕΘΩΡΑΚΙΣΜΕΝΑ" },
-                    new PersonPickerItem { DisplayRank = "Στρατιώτης", DisplayFullName = "ΓΕΩΡΓΙΟΥ ΓΕΩΡΓΙΟΣ", DisplayUnit = "2ος ΛΟΧΟΣ", DisplayAsm = "67890", Specialty = "ΤΥΦΕΚΙΟΦΟΡΟΣ" }
-                };
-
-                picker.ItemsSource = items;
-
-                // 1. Search by Rank
-                picker.ApplyFilter("Λοχαγός");
-                Assert.Single(picker.FilteredItems);
-                Assert.Equal("ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΛΑΟΣ", picker.FilteredItems[0].DisplayFullName);
-
-                // 2. Search by FullName
-                picker.ApplyFilter("ΓΕΩΡΓΙΟΥ");
-                Assert.Single(picker.FilteredItems);
-                Assert.Equal("67890", picker.FilteredItems[0].DisplayAsm);
-
-                // 3. Search by Unit
-                picker.ApplyFilter("1ος ΛΟΧΟΣ");
-                Assert.Single(picker.FilteredItems);
-                Assert.Equal("12345", picker.FilteredItems[0].DisplayAsm);
-
-                // 4. Search by ASM
-                picker.ApplyFilter("67890");
-                Assert.Single(picker.FilteredItems);
-                Assert.Equal("ΓΕΩΡΓΙΟΥ ΓΕΩΡΓΙΟΣ", picker.FilteredItems[0].DisplayFullName);
-
-                // 5. Search by Specialty
-                picker.ApplyFilter("ΤΕΘΩΡΑΚΙΣΜΕΝΑ");
-                Assert.Single(picker.FilteredItems);
-                Assert.Equal("ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΛΑΟΣ", picker.FilteredItems[0].DisplayFullName);
-
-                // 6. Reset search / Empty query
-                picker.ApplyFilter("");
-                Assert.Equal(2, picker.FilteredItems.Count);
-            });
-
-            staThread.SetApartmentState(ApartmentState.STA);
-            staThread.Start();
-            staThread.Join();
-        }
 
         [Fact]
         public void ScreenshotCapture_FullMainWindow_1366x768_and_1024x768()
