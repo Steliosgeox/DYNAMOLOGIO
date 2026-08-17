@@ -83,9 +83,9 @@ namespace Dynamologio.Tests
         public bool PrintDocument(object document, string title) => true;
     }
 
-    public class FailingAuditService : IAuditService
+    public class FailingAuditPublisher : IAuditEventPublisher
     {
-        public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null)
+        public void Publish(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null)
         {
             throw new InvalidOperationException("Σφάλμα προσομοίωσης κατά την εγγραφή του AuditEvent!");
         }
@@ -369,7 +369,7 @@ namespace Dynamologio.Tests
         [Fact]
         public void AT_TX_001_AuditFailureRollback_ForPersonnel()
         {
-            var failingAudit = new FailingAuditService();
+            var failingAudit = new FailingAuditPublisher();
             var actor = new TestCurrentActor();
             var tx = new LiteDbTransactionRunner(_uow);
             var svc = new PersonnelService(_uow, failingAudit, tx, _clock, actor);
@@ -401,7 +401,7 @@ namespace Dynamologio.Tests
         [Fact]
         public void AT_TX_002_AuditFailureRollback_ForAbsence()
         {
-            var failingAudit = new FailingAuditService();
+            var failingAudit = new FailingAuditPublisher();
             var actor = new TestCurrentActor();
             var tx = new LiteDbTransactionRunner(_uow);
             var svc = new AbsenceService(_uow, failingAudit, tx, _clock, actor);
@@ -425,7 +425,7 @@ namespace Dynamologio.Tests
         [Fact]
         public void AT_TX_003_AuditFailureRollback_ForService()
         {
-            var failingAudit = new FailingAuditService();
+            var failingAudit = new FailingAuditPublisher();
             var actor = new TestCurrentActor();
             var tx = new LiteDbTransactionRunner(_uow);
             var svc = new DutyService(_uow, failingAudit, tx, _clock, actor);
@@ -703,8 +703,9 @@ namespace Dynamologio.Tests
                     var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
                     var lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                     var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
-                    var auditService = new AuditService(_uow);
+                    var auditSink = new LiteDbAuditSink(_uow);
                     var actor = new TestCurrentActor();
+                    var auditService = new AuditEventPublisher(new[] { auditSink }, actor, _clock);
                     var tx = new LiteDbTransactionRunner(_uow);
                     var personnelService = new PersonnelService(_uow, auditService, tx, _clock, actor);
                     var absenceService = new AbsenceService(_uow, auditService, tx, _clock, actor);

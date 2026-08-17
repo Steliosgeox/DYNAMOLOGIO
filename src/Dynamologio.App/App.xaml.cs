@@ -72,13 +72,14 @@ namespace Dynamologio.App
                 IStatusEngine statusEngine = new StatusEngine();
                 IStrengthCalculator strengthCalculator = new StrengthCalculationEngine(statusEngine);
                 IConflictEngine conflictEngine = new ConflictEngine();
-                IAuditService auditService = new AuditService(_unitOfWork);
+                IAuditEventSink auditSink = new LiteDbAuditSink(_unitOfWork);
+                ICurrentActor currentActor = new WindowsCurrentActor();
+                IAuditEventPublisher auditService = new AuditEventPublisher(new[] { auditSink }, currentActor, clock);
                 IBackupService backupService = new BackupService(_unitOfWork, _dbContext.DbFilePath, keyProvider);
                 IDatabaseLifecycleCoordinator lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                 IDiagnosticPackageService diagnosticService = new DiagnosticPackageService(_unitOfWork, _dbContext.DbFilePath);
 
                 ITransactionRunner transactionRunner = new LiteDbTransactionRunner(_unitOfWork);
-                ICurrentActor currentActor = new WindowsCurrentActor();
 
                 IPersonnelService personnelService = new PersonnelService(_unitOfWork, auditService, transactionRunner, clock, currentActor);
                 IAbsenceService absenceService = new AbsenceService(_unitOfWork, auditService, transactionRunner, clock, currentActor);

@@ -13,41 +13,7 @@ using Newtonsoft.Json;
 
 namespace Dynamologio.Infrastructure.Services
 {
-    public interface IAuditService
-    {
-        void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null);
-    }
 
-    public class AuditService : IAuditService
-    {
-        private readonly IUnitOfWork _uow;
-
-        public AuditService(IUnitOfWork uow)
-        {
-            _uow = uow ?? throw new ArgumentNullException(nameof(uow));
-        }
-
-        public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null)
-        {
-            string actor = !string.IsNullOrWhiteSpace(username) ? username : $"{Environment.UserDomainName}\\{Environment.UserName}";
-            if (string.IsNullOrWhiteSpace(actor) || actor == "\\") actor = Environment.UserName;
-
-            var audit = new AuditEvent
-            {
-                Username = actor,
-                Action = action,
-                EntityType = entityType ?? string.Empty,
-                EntityId = entityId ?? string.Empty,
-                Summary = summary ?? string.Empty,
-                OldValueJson = oldValue != null ? JsonConvert.SerializeObject(oldValue) : string.Empty,
-                NewValueJson = newValue != null ? JsonConvert.SerializeObject(newValue) : string.Empty,
-                ImportBatchId = importBatchId,
-                AppVersion = "1.0.0.0"
-            };
-
-            _uow.AuditEvents.Insert(audit);
-        }
-    }
 
     public class BackupManifest
     {

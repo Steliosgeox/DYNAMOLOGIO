@@ -17,12 +17,12 @@ namespace Dynamologio.Infrastructure.Services
     public class PersonnelService : IPersonnelService
     {
         private readonly IUnitOfWork _uow;
-        private readonly IAuditService _audit;
+        private readonly IAuditEventPublisher _audit;
         private readonly ITransactionRunner _tx;
         private readonly IClock _clock;
         private readonly ICurrentActor _actor;
 
-        public PersonnelService(IUnitOfWork uow, IAuditService audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
+        public PersonnelService(IUnitOfWork uow, IAuditEventPublisher audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
@@ -44,7 +44,7 @@ namespace Dynamologio.Infrastructure.Services
                 person.ModifiedBy = _actor.GetActor();
 
                 _uow.Personnel.Insert(person);
-                _audit.LogAction(AuditAction.Create, "Personnel", person.Id.ToString(), reason ?? "Δημιουργία προσώπου", null, person);
+                _audit.Publish(AuditAction.Create, "Personnel", person.Id.ToString(), reason ?? "Δημιουργία προσώπου", null, person);
             });
         }
 
@@ -62,7 +62,7 @@ namespace Dynamologio.Infrastructure.Services
                 person.ModifiedBy = _actor.GetActor();
                 
                 _uow.Personnel.Update(person);
-                _audit.LogAction(AuditAction.Update, "Personnel", person.Id.ToString(), reason ?? "Ενημέρωση στοιχείων προσώπου", oldPerson, person);
+                _audit.Publish(AuditAction.Update, "Personnel", person.Id.ToString(), reason ?? "Ενημέρωση στοιχείων προσώπου", oldPerson, person);
             });
         }
 
@@ -88,7 +88,7 @@ namespace Dynamologio.Infrastructure.Services
                 person.ModifiedBy = _actor.GetActor();
 
                 _uow.Personnel.Update(person);
-                _audit.LogAction(AuditAction.Archive, "Personnel", person.Id.ToString(), reason ?? "Αρχειοθέτηση προσώπου", oldPerson, person);
+                _audit.Publish(AuditAction.Archive, "Personnel", person.Id.ToString(), reason ?? "Αρχειοθέτηση προσώπου", oldPerson, person);
             });
         }
 
@@ -125,12 +125,12 @@ namespace Dynamologio.Infrastructure.Services
     public class AbsenceService : IAbsenceService
     {
         private readonly IUnitOfWork _uow;
-        private readonly IAuditService _audit;
+        private readonly IAuditEventPublisher _audit;
         private readonly ITransactionRunner _tx;
         private readonly IClock _clock;
         private readonly ICurrentActor _actor;
 
-        public AbsenceService(IUnitOfWork uow, IAuditService audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
+        public AbsenceService(IUnitOfWork uow, IAuditEventPublisher audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
@@ -152,7 +152,7 @@ namespace Dynamologio.Infrastructure.Services
                 ev.ModifiedBy = _actor.GetActor();
 
                 _uow.StatusEvents.Insert(ev);
-                _audit.LogAction(AuditAction.Create, "StatusEvent", ev.Id.ToString(), reason ?? "Καταχώρηση απουσίας/άδειας", null, ev);
+                _audit.Publish(AuditAction.Create, "StatusEvent", ev.Id.ToString(), reason ?? "Καταχώρηση απουσίας/άδειας", null, ev);
             });
         }
 
@@ -172,7 +172,7 @@ namespace Dynamologio.Infrastructure.Services
                 ev.ModifiedBy = _actor.GetActor();
 
                 _uow.StatusEvents.Update(ev);
-                _audit.LogAction(AuditAction.Cancel, "StatusEvent", ev.Id.ToString(), reason ?? "Ακύρωση απουσίας", oldEv, ev);
+                _audit.Publish(AuditAction.Cancel, "StatusEvent", ev.Id.ToString(), reason ?? "Ακύρωση απουσίας", oldEv, ev);
             });
         }
 
@@ -208,12 +208,12 @@ namespace Dynamologio.Infrastructure.Services
     public class DutyService : IDutyService
     {
         private readonly IUnitOfWork _uow;
-        private readonly IAuditService _audit;
+        private readonly IAuditEventPublisher _audit;
         private readonly ITransactionRunner _tx;
         private readonly IClock _clock;
         private readonly ICurrentActor _actor;
 
-        public DutyService(IUnitOfWork uow, IAuditService audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
+        public DutyService(IUnitOfWork uow, IAuditEventPublisher audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
@@ -235,7 +235,7 @@ namespace Dynamologio.Infrastructure.Services
                 assignment.ModifiedBy = _actor.GetActor();
 
                 _uow.ServiceAssignments.Insert(assignment);
-                _audit.LogAction(AuditAction.Create, "ServiceAssignment", assignment.Id.ToString(), reason ?? "Ανάθεση υπηρεσίας", null, assignment);
+                _audit.Publish(AuditAction.Create, "ServiceAssignment", assignment.Id.ToString(), reason ?? "Ανάθεση υπηρεσίας", null, assignment);
             });
         }
 
@@ -253,7 +253,7 @@ namespace Dynamologio.Infrastructure.Services
                 assignment.ModifiedBy = _actor.GetActor();
 
                 _uow.ServiceAssignments.Update(assignment);
-                _audit.LogAction(AuditAction.Cancel, "ServiceAssignment", assignment.Id.ToString(), reason ?? "Ακύρωση υπηρεσίας", oldAssignment, assignment);
+                _audit.Publish(AuditAction.Cancel, "ServiceAssignment", assignment.Id.ToString(), reason ?? "Ακύρωση υπηρεσίας", oldAssignment, assignment);
             });
         }
 
