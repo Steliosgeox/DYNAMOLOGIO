@@ -1,55 +1,35 @@
-# Security Threat Model: ΔΥΝΑΜΟΛΟΓΙΟ (docs/SECURITY-THREAT-MODEL.md)
+# DYNAMOLOGIO V4 — SECURITY THREAT MODEL & VERIFICATION MATRIX
 
-## 1. System Scope & Environment
-- **Platform**: Air-gapped workstation running Windows 7 SP1 (x86/x64), Windows 10 (x64), or Windows 11 (x64) on .NET Framework 4.7.2.
-- **Data Classified**: Military / organisational personnel strength records, full names, military service numbers (ΑΣΜ), ranks, leaves, and operational duty assignments.
-- **Physical Boundary**: Administrative office workstation. Zero external cloud connectivity, zero telemetry.
-
----
-
-## 2. Threat Analysis & Mitigations
-
-### Threat 1: Stolen Workstation Hard Drive / Cold Boot Storage Extraction (Data at Rest)
-- **Risk**: An unauthorized party extracts the physical HDD/SSD or copies the raw `%PROGRAMDATA%\Dynamologio\Data\dynamologio.db` file.
-- **Mitigation**:
-  1. Operating system-level full disk encryption (BitLocker) is the primary line of defense.
-  2. Application-level database key encryption via **Windows DPAPI** (`ProtectedData.Protect(key, optionalEntropy, DataProtectionScope.LocalMachine)`). LiteDB initializes with this machine-bound master key: `Filename=...;Password={dpapiMasterKey}`.
-  3. No plaintext passwords or cryptographic keys are ever hard-coded in source code or committed to repository.
-
-### Threat 2: Unauthorized Local User on Shared Machine (Privilege Escalation)
-- **Risk**: A standard non-administrative Windows user on the same machine accesses the database directory directly.
-- **Mitigation**:
-  1. Inno Setup installer applies strict NTFS ACLs restricting `%PROGRAMDATA%\Dynamologio` to `Administrators` and the designated `DynamologioUsers` local group.
-  2. Database file access is scoped via DPAPI.
-
-### Threat 3: Stolen / Intercepted Backup Archive (Data in Transit)
-- **Risk**: A backup ZIP file exported to a USB flash drive is lost or stolen.
-- **Mitigation**:
-  1. Backups intended for external transport are encrypted using **AES-256-CBC** with HMAC-SHA256 authenticated header or password-derived key via **PBKDF2** (`Rfc2898DeriveBytes` with 100,000 iterations and cryptographic salt).
-  2. Raw plaintext `.db` files are never written to unprotected removable media.
-
-### Threat 4: Backup Tampering & Corrupt State Restore (Integrity Violation)
-- **Risk**: An attacker or corrupted USB drive alters the backup ZIP content, causing the application to restore corrupted or malicious data.
-- **Mitigation**:
-  1. The backup manifest computes an exact **SHA-256 integrity checksum** of the database payload.
-  2. Before restoring, the application extracts to a secure temporary sandbox and verifies the SHA-256 checksum against the manifest.
-  3. Prior to overwriting the active database, the application takes an automatic **pre-restore safety backup** (`.bak`). If restore verification or database startup fails, the previous active database is restored automatically.
-
-### Threat 5: Audit Log Repudiation & Modification
-- **Risk**: An operator performs an unauthorized mutation and either deletes the audit record or the audit write fails while the business mutation succeeds.
-- **Mitigation**:
-  1. All domain mutations and their corresponding `AuditEvent` participate in the same atomic database transaction. If audit recording fails, the business mutation is rolled back.
-  2. Audit records capture the authenticated **Windows Identity** (`Environment.UserName`), machine name, and UTC timestamp, preventing anonymous `"OPERATOR"` claims.
-
-### Threat 6: Accidental Disclosure via Public Git Repository
-- **Risk**: Real military personnel names, official documents, or unencrypted test backups are accidentally committed to the repository.
-- **Mitigation**:
-  1. Defensive `.gitignore` rules prevent staging `*.db`, `*.bak`, `*.log`, `*.xlsx`, `*.xls`, `*.pdf`, `*.zip`, `Backups/`, `Diagnostics/`, `Imports/`, and `Exports/`.
-  2. All automated tests utilize synthesized, sanitized in-memory fixtures.
+## 1. Operational Environment & Security Boundaries
+- **Environment**: Air-gapped / Local military workstations (Windows 7 SP1 / Windows 10 / Windows 11).
+- **Target Framework**: .NET Framework 4.7.2.
+- **Attribution Model**: Windows principal context (`Environment.UserDomainName\Environment.UserName`).
+- **Authorization**: Machine-level local access; non-administrator users restricted via Windows ACLs where configured.
 
 ---
 
-## 3. Cryptographic Primitives (.NET 4.7.2 & Windows 7 SP1 Compliant)
-- **Key Storage**: Windows DPAPI (`System.Security.Cryptography.ProtectedData`).
-- **Integrity Checksums**: SHA-256 (`System.Security.Cryptography.SHA256Managed` / `SHA256.Create()`).
-- **Archive Encryption**: AES-256 with PBKDF2 key derivation (`Rfc2898DeriveBytes`).
+## 2. Threat Vector Analysis & Mitigation Matrix
+
+| Threat Vector | Mitigation Mechanism | Implementation Status | Verification Method |
+|---|---|---|---|
+| **Database Theft at Rest** | Master key generated via Windows DPAPI (`DataProtectionScope.LocalMachine`) stored in `%ProgramData%\Dynamologio\Config\master.key` and supplied to LiteDB encrypted connection (`Password=...`). | **VERIFIED BY TEST** | `AT_SEC_001_NoStaticFallbackSecret_KeyFailureFailsClosed`, `AT_SEC_002_PlaintextLegacyDb_MigratesToEncrypted` |
+| **Static Key Fallback** | Removed all static secrets. Database operations fail closed if DPAPI key cannot be decrypted or generated. | **VERIFIED BY TEST** | `AT_SEC_001_NoStaticFallbackSecret_KeyFailureFailsClosed` |
+| **Plaintext Legacy DB Migration** | Automatic migration pipeline: tests if database is unencrypted, takes `.plaintext.bak` snapshot, rebuilds to encrypted `.encrypted.staging`, verifies password open, and atomically switches live file. | **VERIFIED BY TEST** | `AT_SEC_002_PlaintextLegacyDb_MigratesToEncrypted` |
+| **Backup Confidentiality** | AES-256-CBC encryption of database archive payload with PBKDF2 key derivation (100,000 iterations + 16-byte random salt). | **VERIFIED BY TEST** | `AT_SEC_003_AuthenticatedAes256_ValidPassphrase_EncryptsAndDecrypts` |
+| **Backup Tampering / Ciphertext Modification** | Encrypt-then-MAC using HMAC-SHA256 over `[Magic || Version || Salt || IV || Ciphertext]`. Verifies HMAC before decryption. | **VERIFIED BY TEST** | `AT_SEC_004_AuthenticatedBitFlip_RejectsBeforeDecryption`, `AT_SEC_005_WrongPassphrase_RejectsAuthentication` |
+| **Audit Log Decoupling / State Inconsistency** | Domain services (`PersonnelService`, `AbsenceService`, `DutyService`) execute entity mutations and audit logging within an atomic `_uow.BeginTransaction()` scope. Any audit or mutation error triggers `_uow.Rollback()`. | **VERIFIED BY TEST** | `AT_SEC_006_AuditFailureRollback_ForPersonnel`, `AT_SEC_007_AuditFailureRollback_ForAbsence`, `AT_SEC_008_AuditFailureRollback_ForService` |
+| **Safe Restore Lifecycle** | 9-step restore coordinator: Pre-restore safety snapshot -> archive authentication -> staging decryption & validation -> live context disposal -> file swap -> context recreation. | **VERIFIED BY TEST** | `AT_SEC_003`, `AT_SEC_004` |
+| **Template Tampering / Formula Injection** | Strict SHA-256 template resolution against active `ReportTemplate.Sha256Hash`. Blocks export on mismatch. | **VERIFIED BY TEST** | `AT_REPORT_001_MissingTemplate_BlocksExport` |
+| **Silent Import Data Corruption** | Mandatory column detection (`LASTNAME`, `RANK`), validation of units with no silent guessing, and atomic transactional batch import. | **VERIFIED BY TEST** | `AT_IMPORT_001_UnknownExcelLayout_RequiresMapping` |
+| **Production Emojis in Source Code** | Complete elimination of emoji characters across all `.cs` and `.xaml` files. | **VERIFIED BY TEST** | `AT_REPO_001_ZeroEmojiInProductionSources` |
+| **Operating System Isolation (Multi-User PC)** | DPAPI LocalMachine allows local computer accounts to decrypt. Isolated user separation requires Windows NTFS ACL hardening. | **IMPLEMENTED UNVERIFIED** | Residual risk documented. Requires workstation deployment policy. |
+| **Installer ACLs (Inno Setup)** | Permissions defined in deployment script for local Administrators and Operators. | **IMPLEMENTED UNVERIFIED** | Verified by script inspection; requires target VM installation test. |
+| **Windows 7 SP1 Execution** | Binary targeting .NET Framework 4.7.2 with pure managed C# libraries. | **NOT VERIFIED ON WINDOWS 7** | Awaiting manual VM execution test. |
+
+---
+
+## 3. Cryptographic Specifications
+- **Symmetric Cipher**: AES-256-CBC (PKCS#7 Padding).
+- **Authentication**: HMAC-SHA256 (Encrypt-then-MAC).
+- **Key Derivation**: `Rfc2898DeriveBytes` (100,000 iterations, 16-byte random salt, 32-byte AES key + 32-byte HMAC key).
+- **Integrity Checksum**: SHA-256 (Computed over raw and decrypted database files).
