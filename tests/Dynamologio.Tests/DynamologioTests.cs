@@ -629,7 +629,7 @@ namespace Dynamologio.Tests
                 current = parent.FullName;
             }
 
-            string screenshotsDir = Path.Combine(current, "docs", "screenshots", "v6");
+            string screenshotsDir = Path.Combine(current, "TestResults", "temp", "artifact");
             if (!Directory.Exists(screenshotsDir)) Directory.CreateDirectory(screenshotsDir);
 
             // Populate rich realistic military demo dataset
@@ -659,43 +659,49 @@ namespace Dynamologio.Tests
                     }
 
                     var keyProvider = new TestKeyProvider();
-                    var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
+                    var statusEngine = new StatusEngine();
+                    var conflictEngine = new ConflictEngine();
+                    var strengthCalc = new StrengthCalculationEngine(statusEngine);
                     var reportService = new ReportGeneratorService(_uow, strengthCalc, new NpoiTemplateWriter());
                     var importService = new ExcelImportService();
                     var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
                     var lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                     var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
                     var auditService = new AuditService(_uow);
+                    var personnelService = new PersonnelService(_uow, auditService);
+                    var absenceService = new AbsenceService(_uow, auditService);
+                    var dutyService = new DutyService(_uow, auditService);
+
+                    var fileDialogService = new TestFileDialogService();
+                    var notificationService = new TestNotificationService();
+                    var confirmationService = new TestConfirmationService();
+                    var printService = new TestPrintService();
+                    var personEditorDialogService = new Dynamologio.App.Services.WpfPersonEditorDialogService(_uow, conflictEngine, personnelService);
 
                     var navService = new Dynamologio.App.Navigation.NavigationService();
                     var shellState = new Dynamologio.App.Navigation.ShellStateService();
-                    var factory = new Dynamologio.App.Navigation.ViewModelFactory(
-                        _uow,
-                        new StatusEngine(),
-                        strengthCalc,
-                        new ConflictEngine(),
-                        reportService,
-                        importService,
-                        backupService,
-                        lifecycleCoordinator,
-                        diagService,
-                        auditService,
-                        new PersonnelService(_uow, auditService),
-                        new AbsenceService(_uow, auditService),
-                        new DutyService(_uow, auditService),
-                        _clock,
-                        navService,
-                        shellState,
-                        new TestFileDialogService(),
-                        new TestNotificationService(),
-                        new TestConfirmationService(),
-                        new TestPrintService());
+                    shellState.UpdateDeploymentHeader("ΜΟΝΑΔΑ", "ΓΡΑΦΕΙΟ / ΤΜΗΜΑ");
+
+                    var factories = new System.Collections.Generic.Dictionary<Dynamologio.App.Navigation.NavigationSection, Func<Dynamologio.App.ViewModels.ViewModelBase>>
+                    {
+                        { Dynamologio.App.Navigation.NavigationSection.Dashboard, () => new DashboardViewModel(_uow, strengthCalc, _clock, navService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Dynamologio, () => new DynamologioViewModel(_uow, strengthCalc, reportService, _clock, shellState, printService, fileDialogService, notificationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Personnel, () => new PersonnelViewModel(_uow, statusEngine, conflictEngine, personnelService, _clock, personEditorDialogService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Absences, () => new AbsencesViewModel(_uow, statusEngine, conflictEngine, absenceService, _clock, notificationService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Services, () => new ServicesViewModel(_uow, conflictEngine, dutyService, _clock, notificationService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Reports, () => new ReportsViewModel(_uow, strengthCalc, reportService, _clock, shellState, printService, fileDialogService, notificationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.ImportExport, () => new ImportExportViewModel(_uow, importService, fileDialogService, notificationService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.DataValidation, () => new DataValidationViewModel(_uow, conflictEngine, statusEngine, _clock) },
+                        { Dynamologio.App.Navigation.NavigationSection.History, () => new HistoryViewModel(_uow, _clock) },
+                        { Dynamologio.App.Navigation.NavigationSection.Settings, () => new SettingsViewModel(_uow, backupService, lifecycleCoordinator, diagService, _clock, shellState, fileDialogService, notificationService, confirmationService) }
+                    };
+
+                    var factory = new Dynamologio.App.Navigation.ViewModelFactory(factories);
 
                     var mainVM = new MainViewModel(
                         navService,
                         factory,
-                        shellState,
-                        _uow);
+                        shellState);
 
                     string[] sections = new[] { "Dashboard", "Dynamologio", "Personnel", "Absences", "Services", "Reports", "ImportExport", "DataValidation", "History", "Settings" };
 

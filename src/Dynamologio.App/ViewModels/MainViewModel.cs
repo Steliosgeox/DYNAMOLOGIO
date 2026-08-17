@@ -20,7 +20,7 @@ namespace Dynamologio.App.ViewModels
         private object _currentViewModel;
         private NavigationSection _activeSection = NavigationSection.Dashboard;
         private string _unitNameHeader = "ΜΟΝΑΔΑ";
-        private string _officeNameHeader = "1ο ΓΡΑΦΕΙΟ";
+        private string _officeNameHeader = "ΓΡΑΦΕΙΟ / ΤΜΗΜΑ";
 
         public object CurrentViewModel
         {
@@ -53,8 +53,7 @@ namespace Dynamologio.App.ViewModels
         public MainViewModel(
             INavigationService navigationService,
             IViewModelFactory viewModelFactory,
-            IShellStateService shellState,
-            IUnitOfWork uow)
+            IShellStateService shellState)
         {
             _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
             _viewModelFactory = viewModelFactory ?? throw new ArgumentNullException(nameof(viewModelFactory));
@@ -81,23 +80,9 @@ namespace Dynamologio.App.ViewModels
 
             InitializeNavigationItems();
 
-            // Load deployment settings from database
-            if (uow != null)
-            {
-                var uSetting = uow.AppSettings.Find(s => s.Key == "Deployment.UnitName").FirstOrDefault();
-                if (uSetting != null && !string.IsNullOrWhiteSpace(uSetting.Value))
-                {
-                    UnitNameHeader = uSetting.Value;
-                    _shellState.UpdateDeploymentHeader(uSetting.Value, _shellState.OfficeName);
-                }
-
-                var oSetting = uow.AppSettings.Find(s => s.Key == "Deployment.OfficeName").FirstOrDefault();
-                if (oSetting != null && !string.IsNullOrWhiteSpace(oSetting.Value))
-                {
-                    OfficeNameHeader = oSetting.Value;
-                    _shellState.UpdateDeploymentHeader(_shellState.UnitName, oSetting.Value);
-                }
-            }
+            // Initialize headers from shell state
+            UnitNameHeader = _shellState.UnitName;
+            OfficeNameHeader = _shellState.OfficeName;
 
             // Navigate to Dashboard on startup
             _navigationService.Navigate(NavigationSection.Dashboard);

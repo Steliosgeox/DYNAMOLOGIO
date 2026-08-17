@@ -3,6 +3,8 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Collections.Generic;
+using System.Linq;
 using Dynamologio.App.ViewModels;
 using Dynamologio.App.Views;
 using Dynamologio.Core.Engines;
@@ -98,38 +100,41 @@ namespace Dynamologio.App
                 INotificationService notificationService = new WpfNotificationService();
                 IConfirmationService confirmationService = new WpfConfirmationService();
                 IPrintService printService = new WpfPrintService();
+                IPersonEditorDialogService personEditorDialogService = new WpfPersonEditorDialogService(_unitOfWork, conflictEngine, personnelService);
 
                 // 6. Initialize Navigation & Shell State
                 INavigationService navigationService = new Dynamologio.App.Navigation.NavigationService();
                 IShellStateService shellStateService = new Dynamologio.App.Navigation.ShellStateService();
-                IViewModelFactory viewModelFactory = new Dynamologio.App.Navigation.ViewModelFactory(
-                    _unitOfWork,
-                    statusEngine,
-                    strengthCalculator,
-                    conflictEngine,
-                    reportService,
-                    importService,
-                    backupService,
-                    lifecycleCoordinator,
-                    diagnosticService,
-                    auditService,
-                    personnelService,
-                    absenceService,
-                    dutyService,
-                    clock,
-                    navigationService,
-                    shellStateService,
-                    fileDialogService,
-                    notificationService,
-                    confirmationService,
-                    printService);
+
+                // 6a. Load deployment settings
+                var uSetting = _unitOfWork.AppSettings.Find(s => s.Key == "Deployment.UnitName").FirstOrDefault();
+                var oSetting = _unitOfWork.AppSettings.Find(s => s.Key == "Deployment.OfficeName").FirstOrDefault();
+                string unitName = (uSetting != null && !string.IsNullOrWhiteSpace(uSetting.Value)) ? uSetting.Value : "ΜΟΝΑΔΑ";
+                string officeName = (oSetting != null && !string.IsNullOrWhiteSpace(oSetting.Value)) ? oSetting.Value : "ΓΡΑΦΕΙΟ / ΤΜΗΜΑ";
+                shellStateService.UpdateDeploymentHeader(unitName, officeName);
+
+                // 6b. Construct ViewModelFactory with a dictionary of delegates
+                var factories = new Dictionary<NavigationSection, Func<ViewModelBase>>
+                {
+                    { NavigationSection.Dashboard, () => new DashboardViewModel(_unitOfWork, strengthCalculator, clock, navigationService) },
+                    { NavigationSection.Dynamologio, () => new DynamologioViewModel(_unitOfWork, strengthCalculator, reportService, clock, shellStateService, printService, fileDialogService, notificationService) },
+                    { NavigationSection.Personnel, () => new PersonnelViewModel(_unitOfWork, statusEngine, conflictEngine, personnelService, clock, personEditorDialogService, confirmationService) },
+                    { NavigationSection.Absences, () => new AbsencesViewModel(_unitOfWork, statusEngine, conflictEngine, absenceService, clock, notificationService, confirmationService) },
+                    { NavigationSection.Services, () => new ServicesViewModel(_unitOfWork, conflictEngine, dutyService, clock, notificationService, confirmationService) },
+                    { NavigationSection.Reports, () => new ReportsViewModel(_unitOfWork, strengthCalculator, reportService, clock, shellStateService, printService, fileDialogService, notificationService) },
+                    { NavigationSection.ImportExport, () => new ImportExportViewModel(_unitOfWork, importService, fileDialogService, notificationService, confirmationService) },
+                    { NavigationSection.DataValidation, () => new DataValidationViewModel(_unitOfWork, conflictEngine, statusEngine, clock) },
+                    { NavigationSection.History, () => new HistoryViewModel(_unitOfWork, clock) },
+                    { NavigationSection.Settings, () => new SettingsViewModel(_unitOfWork, backupService, lifecycleCoordinator, diagnosticService, clock, shellStateService, fileDialogService, notificationService, confirmationService) }
+                };
+
+                IViewModelFactory viewModelFactory = new Dynamologio.App.Navigation.ViewModelFactory(factories);
 
                 // 7. Initialize Main View & Coordinator
                 var mainViewModel = new MainViewModel(
                     navigationService,
                     viewModelFactory,
-                    shellStateService,
-                    _unitOfWork);
+                    shellStateService);
 
                 var mainWindow = new MainWindow
                 {

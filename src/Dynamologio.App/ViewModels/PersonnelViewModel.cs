@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using Dynamologio.App.Navigation;
-using Dynamologio.App.Views;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
@@ -21,7 +20,7 @@ namespace Dynamologio.App.ViewModels
         private readonly IConflictEngine _conflictEngine;
         private readonly IPersonnelService _personnelService;
         private readonly IClock _clock;
-        private readonly INotificationService _notificationService;
+        private readonly IPersonEditorDialogService _personEditorDialogService;
         private readonly IConfirmationService _confirmationService;
 
         private string _searchText = string.Empty;
@@ -80,7 +79,7 @@ namespace Dynamologio.App.ViewModels
             IConflictEngine conflictEngine,
             IPersonnelService personnelService,
             IClock clock,
-            INotificationService notificationService,
+            IPersonEditorDialogService personEditorDialogService,
             IConfirmationService confirmationService)
         {
             _uow = uow;
@@ -88,7 +87,7 @@ namespace Dynamologio.App.ViewModels
             _conflictEngine = conflictEngine;
             _personnelService = personnelService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _personEditorDialogService = personEditorDialogService ?? throw new ArgumentNullException(nameof(personEditorDialogService));
             _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
 
             AddPersonCommand = new RelayCommand(AddPerson);
@@ -176,9 +175,7 @@ namespace Dynamologio.App.ViewModels
 
         private void AddPerson()
         {
-            var editorVM = new PersonEditorViewModel(_uow, _conflictEngine, _personnelService);
-            var dialog = new PersonEditorDialog(editorVM);
-            if (dialog.ShowDialog() == true)
+            if (_personEditorDialogService.ShowAddDialog())
             {
                 LoadData();
             }
@@ -188,9 +185,7 @@ namespace Dynamologio.App.ViewModels
         {
             if (SelectedPerson?.Person == null) return;
 
-            var editorVM = new PersonEditorViewModel(_uow, _conflictEngine, _personnelService, SelectedPerson.Person);
-            var dialog = new PersonEditorDialog(editorVM);
-            if (dialog.ShowDialog() == true)
+            if (_personEditorDialogService.ShowEditDialog(SelectedPerson.Person))
             {
                 LoadData();
             }
