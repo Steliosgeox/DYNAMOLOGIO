@@ -10,6 +10,7 @@ using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Core.Projections;
 using Dynamologio.Infrastructure.Services;
+using Dynamologio.App.Services;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -20,6 +21,8 @@ namespace Dynamologio.App.ViewModels
         private readonly IConflictEngine _conflictEngine;
         private readonly IPersonnelService _personnelService;
         private readonly IClock _clock;
+        private readonly INotificationService _notificationService;
+        private readonly IConfirmationService _confirmationService;
 
         private string _searchText = string.Empty;
         private string _selectedCategoryFilter = "Όλοι";
@@ -76,13 +79,17 @@ namespace Dynamologio.App.ViewModels
             IStatusEngine statusEngine,
             IConflictEngine conflictEngine,
             IPersonnelService personnelService,
-            IClock clock)
+            IClock clock,
+            INotificationService notificationService,
+            IConfirmationService confirmationService)
         {
             _uow = uow;
             _statusEngine = statusEngine;
             _conflictEngine = conflictEngine;
             _personnelService = personnelService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
 
             AddPersonCommand = new RelayCommand(AddPerson);
             EditPersonCommand = new RelayCommand(EditPerson, () => SelectedPerson != null);
@@ -192,14 +199,11 @@ namespace Dynamologio.App.ViewModels
         private void ArchivePerson()
         {
             if (SelectedPerson?.Person == null) return;
-            // Will be moved to IConfirmationService in Commit 2
-            var res = System.Windows.MessageBox.Show(
-                $"Θα αρχειοθετηθεί ο:\n{SelectedPerson.Rank?.ShortName} {SelectedPerson.Person.FullName}\n\nΗ εγγραφή θα παραμείνει διαθέσιμη στο ιστορικό.\nΣυνέχεια;",
+            var res = _confirmationService.Confirm(
                 "Επιβεβαίωση Αρχειοθέτησης",
-                System.Windows.MessageBoxButton.YesNo,
-                System.Windows.MessageBoxImage.Question);
+                $"Θα αρχειοθετηθεί ο:\n{SelectedPerson.Rank?.ShortName} {SelectedPerson.Person.FullName}\n\nΗ εγγραφή θα παραμείνει διαθέσιμη στο ιστορικό.\nΣυνέχεια;");
 
-            if (res == System.Windows.MessageBoxResult.Yes)
+            if (res)
             {
                 _personnelService.ArchivePerson(SelectedPerson.Person.Id, $"Αρχειοθέτηση {SelectedPerson.Person.FullName}");
                 LoadData();

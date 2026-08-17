@@ -4,6 +4,7 @@ using Dynamologio.Core.Interfaces;
 using Dynamologio.ImportExport.Excel.Import;
 using Dynamologio.Infrastructure.Services;
 using Dynamologio.Reporting.Services;
+using Dynamologio.App.Services;
 
 namespace Dynamologio.App.Navigation
 {
@@ -29,6 +30,10 @@ namespace Dynamologio.App.Navigation
         private readonly IClock _clock;
         private readonly INavigationService _navigationService;
         private readonly IShellStateService _shellState;
+        private readonly IFileDialogService _fileDialogService;
+        private readonly INotificationService _notificationService;
+        private readonly IConfirmationService _confirmationService;
+        private readonly IPrintService _printService;
 
         public ViewModelFactory(
             IUnitOfWork uow,
@@ -46,7 +51,11 @@ namespace Dynamologio.App.Navigation
             IDutyService dutyService,
             IClock clock,
             INavigationService navigationService,
-            IShellStateService shellState)
+            IShellStateService shellState,
+            IFileDialogService fileDialogService,
+            INotificationService notificationService,
+            IConfirmationService confirmationService,
+            IPrintService printService)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _statusEngine = statusEngine ?? throw new ArgumentNullException(nameof(statusEngine));
@@ -64,6 +73,10 @@ namespace Dynamologio.App.Navigation
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
             _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
+            _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
+            _printService = printService ?? throw new ArgumentNullException(nameof(printService));
         }
 
         public ViewModelBase Create(NavigationSection section)
@@ -73,23 +86,23 @@ namespace Dynamologio.App.Navigation
                 case NavigationSection.Dashboard:
                     return new DashboardViewModel(_uow, _strengthCalculator, _clock, _navigationService);
                 case NavigationSection.Dynamologio:
-                    return new DynamologioViewModel(_uow, _strengthCalculator, _reportService, _clock, _shellState);
+                    return new DynamologioViewModel(_uow, _strengthCalculator, _reportService, _clock, _shellState, _printService, _fileDialogService, _notificationService);
                 case NavigationSection.Personnel:
-                    return new PersonnelViewModel(_uow, _statusEngine, _conflictEngine, _personnelService, _clock);
+                    return new PersonnelViewModel(_uow, _statusEngine, _conflictEngine, _personnelService, _clock, _notificationService, _confirmationService);
                 case NavigationSection.Absences:
-                    return new AbsencesViewModel(_uow, _statusEngine, _conflictEngine, _absenceService, _clock);
+                    return new AbsencesViewModel(_uow, _statusEngine, _conflictEngine, _absenceService, _clock, _notificationService, _confirmationService);
                 case NavigationSection.Services:
-                    return new ServicesViewModel(_uow, _conflictEngine, _dutyService, _clock);
+                    return new ServicesViewModel(_uow, _conflictEngine, _dutyService, _clock, _notificationService, _confirmationService);
                 case NavigationSection.Reports:
-                    return new ReportsViewModel(_uow, _strengthCalculator, _reportService, _clock, _shellState);
+                    return new ReportsViewModel(_uow, _strengthCalculator, _reportService, _clock, _shellState, _printService, _fileDialogService, _notificationService);
                 case NavigationSection.ImportExport:
-                    return new ImportExportViewModel(_uow, _importService);
+                    return new ImportExportViewModel(_uow, _importService, _fileDialogService, _notificationService, _confirmationService);
                 case NavigationSection.DataValidation:
                     return new DataValidationViewModel(_uow, _conflictEngine, _statusEngine, _clock);
                 case NavigationSection.History:
                     return new HistoryViewModel(_uow, _clock);
                 case NavigationSection.Settings:
-                    return new SettingsViewModel(_uow, _backupService, _lifecycleCoordinator, _diagnosticService, _clock, _shellState);
+                    return new SettingsViewModel(_uow, _backupService, _lifecycleCoordinator, _diagnosticService, _clock, _shellState, _fileDialogService, _notificationService, _confirmationService);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(section), section, "Unknown navigation section.");
             }

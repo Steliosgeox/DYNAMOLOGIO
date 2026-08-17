@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using Dynamologio.App.Controls;
 using Dynamologio.App.ViewModels;
 using Dynamologio.App.Views;
+using Dynamologio.App.Services;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
@@ -55,6 +56,31 @@ namespace Dynamologio.Tests
 
         public string GetDatabaseMasterPassword() => _pwd;
         public byte[] GetMachineBackupKey() => _backupKey;
+    }
+
+    public class TestFileDialogService : IFileDialogService
+    {
+        public string OpenExcelFile() => null;
+        public string SaveExcelFile(string defaultName) => null;
+        public string SelectBackupFile() => null;
+        public string SelectBackupDestination(string defaultName) => null;
+    }
+
+    public class TestConfirmationService : IConfirmationService
+    {
+        public bool Confirm(string title, string message) => true;
+    }
+
+    public class TestNotificationService : INotificationService
+    {
+        public void Info(string title, string message) { }
+        public void Warning(string title, string message) { }
+        public void Error(string title, string message) { }
+    }
+
+    public class TestPrintService : IPrintService
+    {
+        public bool PrintDocument(object document, string title) => true;
     }
 
     public class FailingAuditService : IAuditService
@@ -659,7 +685,11 @@ namespace Dynamologio.Tests
                         new DutyService(_uow, auditService),
                         _clock,
                         navService,
-                        shellState);
+                        shellState,
+                        new TestFileDialogService(),
+                        new TestNotificationService(),
+                        new TestConfirmationService(),
+                        new TestPrintService());
 
                     var mainVM = new MainViewModel(
                         navService,

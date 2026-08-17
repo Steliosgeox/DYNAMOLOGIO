@@ -9,6 +9,7 @@ using Dynamologio.Core.Engines;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.ImportExport.Excel;
 using Dynamologio.App.Navigation;
+using Dynamologio.App.Services;
 using Dynamologio.ImportExport.Excel.Import;
 using Dynamologio.Infrastructure.LiteDb;
 using Dynamologio.Infrastructure.Migrations;
@@ -92,7 +93,13 @@ namespace Dynamologio.App
                     // Non-blocking auto backup
                 }
 
-                // 5. Initialize Navigation & Shell State
+                // 5. Initialize UI Services
+                IFileDialogService fileDialogService = new WpfFileDialogService();
+                INotificationService notificationService = new WpfNotificationService();
+                IConfirmationService confirmationService = new WpfConfirmationService();
+                IPrintService printService = new WpfPrintService();
+
+                // 6. Initialize Navigation & Shell State
                 INavigationService navigationService = new Dynamologio.App.Navigation.NavigationService();
                 IShellStateService shellStateService = new Dynamologio.App.Navigation.ShellStateService();
                 IViewModelFactory viewModelFactory = new Dynamologio.App.Navigation.ViewModelFactory(
@@ -111,9 +118,13 @@ namespace Dynamologio.App
                     dutyService,
                     clock,
                     navigationService,
-                    shellStateService);
+                    shellStateService,
+                    fileDialogService,
+                    notificationService,
+                    confirmationService,
+                    printService);
 
-                // 6. Initialize Main View & Coordinator
+                // 7. Initialize Main View & Coordinator
                 var mainViewModel = new MainViewModel(
                     navigationService,
                     viewModelFactory,

@@ -4,6 +4,7 @@ using System.Windows.Input;
 using Dynamologio.App.Navigation;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.ImportExport.Excel.Import;
+using Dynamologio.App.Services;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -11,6 +12,9 @@ namespace Dynamologio.App.ViewModels
     {
         private readonly IUnitOfWork _uow;
         private readonly IExcelImportService _importService;
+        private readonly IFileDialogService _fileDialogService;
+        private readonly INotificationService _notificationService;
+        private readonly IConfirmationService _confirmationService;
 
         private string _selectedFilePath = string.Empty;
         private ImportPreviewReport _previewReport;
@@ -28,10 +32,18 @@ namespace Dynamologio.App.ViewModels
         public ICommand AnalyzeFileCommand { get; }
         public ICommand CommitImportCommand { get; }
 
-        public ImportExportViewModel(IUnitOfWork uow, IExcelImportService importService)
+        public ImportExportViewModel(
+            IUnitOfWork uow,
+            IExcelImportService importService,
+            IFileDialogService fileDialogService,
+            INotificationService notificationService,
+            IConfirmationService confirmationService)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _importService = importService ?? throw new ArgumentNullException(nameof(importService));
+            _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
 
             BrowseFileCommand = new RelayCommand(BrowseFile);
             AnalyzeFileCommand = new RelayCommand(AnalyzeFile, () => !string.IsNullOrEmpty(SelectedFilePath) && !IsBusy);
@@ -45,16 +57,10 @@ namespace Dynamologio.App.ViewModels
 
         private void BrowseFile()
         {
-            // Will be moved to IFileDialogService in Commit 2
-            var ofd = new Microsoft.Win32.OpenFileDialog
+            var file = _fileDialogService.OpenExcelFile();
+            if (file != null)
             {
-                Filter = "Excel Files (*.xlsx;*.xls)|*.xlsx;*.xls",
-                Title = "Επιλογή Αρχείου Excel Προσωπικού"
-            };
-
-            if (ofd.ShowDialog() == true)
-            {
-                SelectedFilePath = ofd.FileName;
+                SelectedFilePath = file;
                 AnalyzeFile();
             }
         }
@@ -87,8 +93,7 @@ namespace Dynamologio.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα ανάλυσης: {ex.Message}";
-                // Will be moved to INotificationService in Commit 2
-                System.Windows.MessageBox.Show(ex.Message, "Σφάλμα Ανάλυσης", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                _notificationService.Error("Σφάλμα Ανάλυσης", ex.Message);
             }
             finally
             {
@@ -100,14 +105,11 @@ namespace Dynamologio.App.ViewModels
         {
             if (PreviewReport == null || !PreviewReport.CanCommit) return;
 
-            // Will be moved to IConfirmationService in Commit 2
-            var res = System.Windows.MessageBox.Show(
-                $"Επιβεβαίωση εκτέλεσης εισαγωγής:\n• {PreviewReport.NewCount} Νέες Εγγραφές\n• {PreviewReport.UpdateCount} Ενημερώσεις Στοιχείων\n\nΣυνέχεια;",
+            var res = _confirmationService.Confirm(
                 "Επιβεβαίωση Εισαγωγής",
-                System.Windows.MessageBoxButton.YesNo,
-                System.Windows.MessageBoxImage.Question);
+                $"Επιβεβαίωση εκτέλεσης εισαγωγής:\n• {PreviewReport.NewCount} Νέες Εγγραφές\n• {PreviewReport.UpdateCount} Ενημερώσεις Στοιχείων\n\nΣυνέχεια;");
 
-            if (res != System.Windows.MessageBoxResult.Yes) return;
+            if (!res) return;
 
             try
             {
@@ -116,11 +118,9 @@ namespace Dynamologio.App.ViewModels
 
                 var batch = _importService.CommitImport(PreviewReport, _uow);
 
-                System.Windows.MessageBox.Show(
-                    $"Η εισαγωγή ολοκληρώθηκε επιτυχώς!\nΑρ. Παρτίδας: {batch.Id}\nΝέες εγγραφές: {batch.InsertedCount}\nΕνημερώσεις: {batch.UpdatedCount}",
+                _notificationService.Info(
                     "Επιτυχής Εισαγωγή",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information);
+                    $"Η εισαγωγή ολοκληρώθηκε επιτυχώς!\nΑρ. Παρτίδας: {batch.Id}\nΝέες εγγραφές: {batch.InsertedCount}\nΕνημερώσεις: {batch.UpdatedCount}");
 
                 StatusMessage = "Η εισαγωγή ολοκληρώθηκε επιτυχώς.";
                 PreviewReport = null;
@@ -130,7 +130,7 @@ namespace Dynamologio.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα εκτέλεσης εισαγωγής: {ex.Message}";
-                System.Windows.MessageBox.Show(ex.Message, "Σφάλμα Εισαγωγής", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                _notificationService.Error("Σφάλμα Εισαγωγής", ex.Message);
             }
             finally
             {

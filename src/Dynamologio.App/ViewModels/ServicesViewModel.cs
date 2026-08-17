@@ -7,6 +7,7 @@ using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Infrastructure.Services;
+using Dynamologio.App.Services;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -32,6 +33,8 @@ namespace Dynamologio.App.ViewModels
         private readonly IConflictEngine _conflictEngine;
         private readonly IDutyService _dutyService;
         private readonly IClock _clock;
+        private readonly INotificationService _notificationService;
+        private readonly IConfirmationService _confirmationService;
 
         public ObservableCollection<ServicePresentationItem> DailyServicesList { get; } = new ObservableCollection<ServicePresentationItem>();
         public ObservableCollection<Personnel> PersonnelList { get; } = new ObservableCollection<Personnel>();
@@ -75,12 +78,16 @@ namespace Dynamologio.App.ViewModels
             IUnitOfWork uow,
             IConflictEngine conflictEngine,
             IDutyService dutyService,
-            IClock clock)
+            IClock clock,
+            INotificationService notificationService,
+            IConfirmationService confirmationService)
         {
             _uow = uow;
             _conflictEngine = conflictEngine;
             _dutyService = dutyService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
 
             _selectedDate = _clock.Today;
 
@@ -183,9 +190,8 @@ namespace Dynamologio.App.ViewModels
             var warning = conflicts.FirstOrDefault(c => c.Severity == ConflictSeverity.Warning);
             if (warning != null)
             {
-                // Will be moved to IConfirmationService in Commit 2
-                var proceed = System.Windows.MessageBox.Show($"{warning.Message}\n\nΕπιθυμείτε να συνεχίσετε με την καταχώρηση;", "Προειδοποίηση Σύγκρουσης", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
-                if (proceed != System.Windows.MessageBoxResult.Yes) return;
+                var proceed = _confirmationService.Confirm("Προειδοποίηση Σύγκρουσης", $"{warning.Message}\n\nΕπιθυμείτε να συνεχίσετε με την καταχώρηση;");
+                if (!proceed) return;
             }
 
             _dutyService.AssignDuty(assignment, $"Ανάθεση υπηρεσίας {SelectedServiceType.Name} σε {SelectedPerson.FullName} για {SelectedDate:dd/MM/yyyy}");
@@ -199,14 +205,11 @@ namespace Dynamologio.App.ViewModels
         {
             if (item?.Assignment == null) return;
 
-            // Will be moved to IConfirmationService in Commit 2
-            var res = System.Windows.MessageBox.Show(
-                $"Θα ακυρωθεί η υπηρεσία:\n{item.RankName} {item.PersonFullName} - {item.ServiceName} ({item.HoursDisplay})\n\nΣυνέχεια;",
+            var res = _confirmationService.Confirm(
                 "Επιβεβαίωση Ακύρωσης",
-                System.Windows.MessageBoxButton.YesNo,
-                System.Windows.MessageBoxImage.Question);
+                $"Θα ακυρωθεί η υπηρεσία:\n{item.RankName} {item.PersonFullName} - {item.ServiceName} ({item.HoursDisplay})\n\nΣυνέχεια;");
 
-            if (res == System.Windows.MessageBoxResult.Yes)
+            if (res)
             {
                 _dutyService.CancelDuty(item.Assignment.Id, $"Ακύρωση υπηρεσίας {item.PersonFullName}");
                 LoadData();

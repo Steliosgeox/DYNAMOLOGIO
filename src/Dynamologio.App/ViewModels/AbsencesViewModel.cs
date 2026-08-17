@@ -10,6 +10,7 @@ using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Infrastructure.Services;
+using Dynamologio.App.Services;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -39,6 +40,8 @@ namespace Dynamologio.App.ViewModels
         private readonly IConflictEngine _conflictEngine;
         private readonly IAbsenceService _absenceService;
         private readonly IClock _clock;
+        private readonly INotificationService _notificationService;
+        private readonly IConfirmationService _confirmationService;
 
         public ObservableCollection<AbsencePresentationItem> ActiveEventsList { get; } = new ObservableCollection<AbsencePresentationItem>();
         public ObservableCollection<AbsencePresentationItem> PlannedEventsList { get; } = new ObservableCollection<AbsencePresentationItem>();
@@ -146,13 +149,17 @@ namespace Dynamologio.App.ViewModels
             IStatusEngine statusEngine,
             IConflictEngine conflictEngine,
             IAbsenceService absenceService,
-            IClock clock)
+            IClock clock,
+            INotificationService notificationService,
+            IConfirmationService confirmationService)
         {
             _uow = uow;
             _statusEngine = statusEngine;
             _conflictEngine = conflictEngine;
             _absenceService = absenceService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
 
             _startDate = _clock.Today;
             _returnDate = _clock.Today.AddDays(5);
@@ -332,14 +339,11 @@ namespace Dynamologio.App.ViewModels
         {
             if (item?.Event == null) return;
 
-            // Will be moved to IConfirmationService in Commit 2
-            var res = System.Windows.MessageBox.Show(
-                $"Θα ακυρωθεί η απουσία:\n{item.PersonFullName} - {item.ReasonName} ({item.StartDisplay} - {item.ReturnDisplay})\n\nΣυνέχεια;",
+            var res = _confirmationService.Confirm(
                 "Επιβεβαίωση Ακύρωσης",
-                System.Windows.MessageBoxButton.YesNo,
-                System.Windows.MessageBoxImage.Question);
+                $"Θα ακυρωθεί η απουσία:\n{item.PersonFullName} - {item.ReasonName} ({item.StartDisplay} - {item.ReturnDisplay})\n\nΣυνέχεια;");
 
-            if (res == System.Windows.MessageBoxResult.Yes)
+            if (res)
             {
                 _absenceService.CancelAbsence(item.Event.Id, $"Ακύρωση απουσίας {item.PersonFullName}");
                 LoadData();

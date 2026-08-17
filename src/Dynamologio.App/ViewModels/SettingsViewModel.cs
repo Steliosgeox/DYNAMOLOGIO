@@ -1,12 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Windows;
 using System.Windows.Input;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Infrastructure.Services;
-using Microsoft.Win32;
+using Dynamologio.App.Services;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -18,6 +17,9 @@ namespace Dynamologio.App.ViewModels
         private readonly IDiagnosticPackageService _diagnosticService;
         private readonly IClock _clock;
         private readonly Dynamologio.App.Navigation.IShellStateService _shellState;
+        private readonly IFileDialogService _fileDialogService;
+        private readonly INotificationService _notificationService;
+        private readonly IConfirmationService _confirmationService;
 
         private string _unitName = "ΜΟΝΑΔΑ";
         private string _officeName = "1ο ΓΡΑΦΕΙΟ";
@@ -40,7 +42,10 @@ namespace Dynamologio.App.ViewModels
             IDatabaseLifecycleCoordinator lifecycleCoordinator,
             IDiagnosticPackageService diagnosticService,
             IClock clock,
-            Dynamologio.App.Navigation.IShellStateService shellState)
+            Dynamologio.App.Navigation.IShellStateService shellState,
+            IFileDialogService fileDialogService,
+            INotificationService notificationService,
+            IConfirmationService confirmationService)
         {
             _uow = uow;
             _backupService = backupService;
@@ -48,6 +53,9 @@ namespace Dynamologio.App.ViewModels
             _diagnosticService = diagnosticService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
+            _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _confirmationService = confirmationService ?? throw new ArgumentNullException(nameof(confirmationService));
 
             SaveUnitSettingsCommand = new RelayCommand(SaveUnitSettings);
             CreateBackupCommand = new RelayCommand(CreateBackup);
@@ -78,7 +86,7 @@ namespace Dynamologio.App.ViewModels
             SaveOrUpdateSetting("Deployment.OfficeName", OfficeName);
             _shellState.UpdateDeploymentHeader(UnitName, OfficeName);
             StatusMessage = "Οι ρυθμίσεις μονάδας αποθηκεύτηκαν επιτυχώς.";
-            MessageBox.Show("Οι ρυθμίσεις μονάδας ενημερώθηκαν.", "Ρυθμίσεις", MessageBoxButton.OK, MessageBoxImage.Information);
+            _notificationService.Info("Ρυθμίσεις", "Οι ρυθμίσεις μονάδας ενημερώθηκαν.");
         }
 
         private void SaveOrUpdateSetting(string key, string val)
@@ -99,25 +107,20 @@ namespace Dynamologio.App.ViewModels
         {
             try
             {
-                var sfd = new SaveFileDialog
+                var backupFile = _fileDialogService.SelectBackupDestination($"Dynamologio_Backup_{_clock.Now:yyyyMMdd_HHmm}.zip");
+                if (backupFile != null)
                 {
-                    Filter = "Dynamologio Backup (*.zip)|*.zip",
-                    FileName = $"Dynamologio_Backup_{_clock.Now:yyyyMMdd_HHmm}.zip"
-                };
-
-                if (sfd.ShowDialog() == true)
-                {
-                    string targetDir = Path.GetDirectoryName(sfd.FileName);
+                    string targetDir = Path.GetDirectoryName(backupFile);
                     var manifest = _backupService.CreateBackup(targetDir);
 
                     string defaultZip = Path.Combine(targetDir, $"Dynamologio_Backup_{manifest.Timestamp:yyyyMMdd_HHmmss}.zip");
-                    if (File.Exists(defaultZip) && defaultZip != sfd.FileName)
+                    if (File.Exists(defaultZip) && defaultZip != backupFile)
                     {
-                        File.Copy(defaultZip, sfd.FileName, true);
+                        File.Copy(defaultZip, backupFile, true);
                     }
 
                     StatusMessage = $"Αντίγραφο ασφαλείας δημιουργήθηκε επιτυχώς (SHA-256: {manifest.DatabaseSha256Checksum.Substring(0, 8)}...).";
-                    MessageBox.Show($"Το αντίγραφο ασφαλείας δημιουργήθηκε επιτυχώς:\n{sfd.FileName}", "Αντίγραφο Ασφαλείας", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _notificationService.Info("Αντίγραφο Ασφαλείας", $"Το αντίγραφο ασφαλείας δημιουργήθηκε επιτυχώς:\n{backupFile}");
 
                     LoadData();
                 }
@@ -125,7 +128,7 @@ namespace Dynamologio.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα αντιγράφου ασφαλείας: {ex.Message}";
-                MessageBox.Show(ex.Message, "Σφάλμα", MessageBoxButton.OK, MessageBoxImage.Error);
+                _notificationService.Error("Σφάλμα", ex.Message);
             }
         }
 
@@ -133,26 +136,17 @@ namespace Dynamologio.App.ViewModels
         {
             try
             {
-                var ofd = new OpenFileDialog
+                var restoreFile = _fileDialogService.SelectBackupFile();
+                if (restoreFile != null)
                 {
-                    Filter = "Dynamologio Backup (*.zip)|*.zip",
-                    Title = "Επιλογή Αντιγράφου Ασφαλείας προς Επαναφορά"
-                };
+                    var confirm = _confirmationService.Confirm("Επιβεβαίωση Επαναφοράς", "ΠΡΟΣΟΧΗ: Η επαναφορά θα αντικαταστήσει όλα τα τρέχοντα δεδομένα της βάσης με τα δεδομένα του αντιγράφου.\n\nΣυνέχεια;");
 
-                if (ofd.ShowDialog() == true)
-                {
-                    var confirm = MessageBox.Show(
-                        "ΠΡΟΣΟΧΗ: Η επαναφορά θα αντικαταστήσει όλα τα τρέχοντα δεδομένα της βάσης με τα δεδομένα του αντιγράφου.\n\nΣυνέχεια;",
-                        "Επιβεβαίωση Επαναφοράς",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning);
-
-                    if (confirm == MessageBoxResult.Yes)
+                    if (confirm)
                     {
                             // _mainVM.RefreshAllViewModels();
                             // App will need to handle this in NavigationService or ShellState
 
-                        MessageBox.Show("Η επαναφορά ολοκληρώθηκε επιτυχώς! Η εφαρμογή ανανέωσε τα δεδομένα της.", "Επιτυχής Επαναφορά", MessageBoxButton.OK, MessageBoxImage.Information);
+                        _notificationService.Info("Επιτυχής Επαναφορά", "Η επαναφορά ολοκληρώθηκε επιτυχώς! Η εφαρμογή ανανέωσε τα δεδομένα της.");
                         StatusMessage = "Η επαναφορά βάσης δεδομένων ολοκληρώθηκε επιτυχώς.";
                         LoadData();
                     }
@@ -161,7 +155,7 @@ namespace Dynamologio.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα επαναφοράς: {ex.Message}";
-                MessageBox.Show(ex.Message, "Σφάλμα Επαναφοράς", MessageBoxButton.OK, MessageBoxImage.Error);
+                _notificationService.Error("Σφάλμα Επαναφοράς", ex.Message);
             }
         }
 
@@ -174,23 +168,18 @@ namespace Dynamologio.App.ViewModels
         {
             try
             {
-                var sfd = new SaveFileDialog
+                var diagFile = _fileDialogService.SaveExcelFile($"Dynamologio_Diagnostics_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
+                if (diagFile != null)
                 {
-                    Filter = "Zip Files (*.zip)|*.zip",
-                    FileName = $"Dynamologio_Diagnostics_{DateTime.Now:yyyyMMdd_HHmmss}.zip"
-                };
-
-                if (sfd.ShowDialog() == true)
-                {
-                    string path = _diagnosticService.ExportDiagnosticPackage(sfd.FileName);
+                    string path = _diagnosticService.ExportDiagnosticPackage(diagFile);
                     StatusMessage = $"Διαγνωστικό πακέτο εξήχθη: {path}";
-                    MessageBox.Show($"Το διαγνωστικό πακέτο εξήχθη επιτυχώς:\n{path}", "Διαγνωστικά", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _notificationService.Info("Διαγνωστικά", $"Το διαγνωστικό πακέτο εξήχθη επιτυχώς:\n{path}");
                 }
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα εξαγωγής διαγνωστικών: {ex.Message}";
-                MessageBox.Show(ex.Message, "Σφάλμα", MessageBoxButton.OK, MessageBoxImage.Error);
+                _notificationService.Error("Σφάλμα", ex.Message);
             }
         }
     }
