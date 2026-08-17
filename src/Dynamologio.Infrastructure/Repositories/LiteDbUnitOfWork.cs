@@ -39,15 +39,12 @@ namespace Dynamologio.Infrastructure.Repositories
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             if (entity.Id == Guid.Empty) entity.Id = Guid.NewGuid();
-            entity.CreatedAt = DateTime.Now;
-            entity.ModifiedAt = DateTime.Now;
             _collection.Insert(entity);
         }
 
         public virtual void Update(T entity)
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
-            entity.ModifiedAt = DateTime.Now;
             _collection.Update(entity);
         }
 

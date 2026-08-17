@@ -8,6 +8,7 @@ namespace Dynamologio.Core.Interfaces
     public interface IClock
     {
         DateTime Now { get; }
+        DateTime UtcNow { get; }
         DateTime Today { get; }
     }
 
@@ -15,6 +16,7 @@ namespace Dynamologio.Core.Interfaces
     {
         public static readonly SystemClock Instance = new SystemClock();
         public DateTime Now => DateTime.Now;
+        public DateTime UtcNow => DateTime.UtcNow;
         public DateTime Today => DateTime.Today;
     }
 
@@ -28,6 +30,7 @@ namespace Dynamologio.Core.Interfaces
         }
 
         public DateTime Now => _current;
+        public DateTime UtcNow => _current.ToUniversalTime();
         public DateTime Today => _current.Date;
 
         public void SetTime(DateTime newDateTime)

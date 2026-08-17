@@ -77,9 +77,12 @@ namespace Dynamologio.App
                 IDatabaseLifecycleCoordinator lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                 IDiagnosticPackageService diagnosticService = new DiagnosticPackageService(_unitOfWork, _dbContext.DbFilePath);
 
-                IPersonnelService personnelService = new PersonnelService(_unitOfWork, auditService);
-                IAbsenceService absenceService = new AbsenceService(_unitOfWork, auditService);
-                IDutyService dutyService = new DutyService(_unitOfWork, auditService);
+                ITransactionRunner transactionRunner = new LiteDbTransactionRunner(_unitOfWork);
+                ICurrentActor currentActor = new WindowsCurrentActor();
+
+                IPersonnelService personnelService = new PersonnelService(_unitOfWork, auditService, transactionRunner, clock, currentActor);
+                IAbsenceService absenceService = new AbsenceService(_unitOfWork, auditService, transactionRunner, clock, currentActor);
+                IDutyService dutyService = new DutyService(_unitOfWork, auditService, transactionRunner, clock, currentActor);
 
                 IExcelTemplateWriter templateWriter = new NpoiTemplateWriter();
                 IReportGeneratorService reportService = new ReportGeneratorService(_unitOfWork, strengthCalculator, templateWriter);

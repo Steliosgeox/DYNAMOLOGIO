@@ -18,11 +18,17 @@ namespace Dynamologio.Infrastructure.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly IAuditService _audit;
+        private readonly ITransactionRunner _tx;
+        private readonly IClock _clock;
+        private readonly ICurrentActor _actor;
 
-        public PersonnelService(IUnitOfWork uow, IAuditService audit)
+        public PersonnelService(IUnitOfWork uow, IAuditService audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
+            _tx = tx ?? throw new ArgumentNullException(nameof(tx));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _actor = actor ?? throw new ArgumentNullException(nameof(actor));
         }
 
         public void CreatePerson(Personnel person, string reason)
@@ -30,18 +36,16 @@ namespace Dynamologio.Infrastructure.Services
             if (person == null) throw new ArgumentNullException(nameof(person));
             ValidatePersonnel(person);
 
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
+                person.CreatedAt = _clock.Now;
+                person.CreatedBy = _actor.GetActor();
+                person.ModifiedAt = _clock.Now;
+                person.ModifiedBy = _actor.GetActor();
+
                 _uow.Personnel.Insert(person);
                 _audit.LogAction(AuditAction.Create, "Personnel", person.Id.ToString(), reason ?? "Δημιουργία προσώπου", null, person);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         public void UpdatePerson(Personnel person, string reason, Personnel oldPerson = null)
@@ -52,24 +56,19 @@ namespace Dynamologio.Infrastructure.Services
             var existing = _uow.Personnel.GetById(person.Id);
             if (existing == null) throw new InvalidOperationException($"Personnel {person.Id} not found.");
 
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
+                person.ModifiedAt = _clock.Now;
+                person.ModifiedBy = _actor.GetActor();
+                
                 _uow.Personnel.Update(person);
                 _audit.LogAction(AuditAction.Update, "Personnel", person.Id.ToString(), reason ?? "Ενημέρωση στοιχείων προσώπου", oldPerson, person);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         public void ArchivePerson(Guid id, string reason)
         {
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
                 var person = _uow.Personnel.GetById(id);
                 if (person == null) throw new InvalidOperationException($"Personnel {id} not found.");
@@ -84,16 +83,13 @@ namespace Dynamologio.Infrastructure.Services
                 };
 
                 person.IsArchived = true;
-                person.StrengthEndDate = DateTime.Today;
+                person.StrengthEndDate = _clock.Today;
+                person.ModifiedAt = _clock.Now;
+                person.ModifiedBy = _actor.GetActor();
+
                 _uow.Personnel.Update(person);
                 _audit.LogAction(AuditAction.Archive, "Personnel", person.Id.ToString(), reason ?? "Αρχειοθέτηση προσώπου", oldPerson, person);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         private void ValidatePersonnel(Personnel person, bool isUpdate = false)
@@ -130,11 +126,17 @@ namespace Dynamologio.Infrastructure.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly IAuditService _audit;
+        private readonly ITransactionRunner _tx;
+        private readonly IClock _clock;
+        private readonly ICurrentActor _actor;
 
-        public AbsenceService(IUnitOfWork uow, IAuditService audit)
+        public AbsenceService(IUnitOfWork uow, IAuditService audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
+            _tx = tx ?? throw new ArgumentNullException(nameof(tx));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _actor = actor ?? throw new ArgumentNullException(nameof(actor));
         }
 
         public void CreateAbsence(StatusEvent ev, string reason)
@@ -142,42 +144,36 @@ namespace Dynamologio.Infrastructure.Services
             if (ev == null) throw new ArgumentNullException(nameof(ev));
             ValidateAbsence(ev);
 
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
+                ev.CreatedAt = _clock.Now;
+                ev.CreatedBy = _actor.GetActor();
+                ev.ModifiedAt = _clock.Now;
+                ev.ModifiedBy = _actor.GetActor();
+
                 _uow.StatusEvents.Insert(ev);
                 _audit.LogAction(AuditAction.Create, "StatusEvent", ev.Id.ToString(), reason ?? "Καταχώρηση απουσίας/άδειας", null, ev);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         public void CancelAbsence(Guid eventId, string reason)
         {
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
                 var ev = _uow.StatusEvents.GetById(eventId);
                 if (ev == null) throw new InvalidOperationException($"StatusEvent {eventId} not found.");
 
                 var oldEv = new StatusEvent { Id = ev.Id, IsCancelled = ev.IsCancelled, CancellationReason = ev.CancellationReason };
                 ev.IsCancelled = true;
-                ev.CancelledAt = DateTime.Now;
+                ev.CancelledAt = _clock.Now;
                 ev.CancellationReason = reason ?? "Ακύρωση από χρήστη";
-                ev.CancelledBy = Environment.UserName;
+                ev.CancelledBy = _actor.GetActor();
+                ev.ModifiedAt = _clock.Now;
+                ev.ModifiedBy = _actor.GetActor();
+
                 _uow.StatusEvents.Update(ev);
                 _audit.LogAction(AuditAction.Cancel, "StatusEvent", ev.Id.ToString(), reason ?? "Ακύρωση απουσίας", oldEv, ev);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         private void ValidateAbsence(StatusEvent ev)
@@ -213,11 +209,17 @@ namespace Dynamologio.Infrastructure.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly IAuditService _audit;
+        private readonly ITransactionRunner _tx;
+        private readonly IClock _clock;
+        private readonly ICurrentActor _actor;
 
-        public DutyService(IUnitOfWork uow, IAuditService audit)
+        public DutyService(IUnitOfWork uow, IAuditService audit, ITransactionRunner tx, IClock clock, ICurrentActor actor)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
+            _tx = tx ?? throw new ArgumentNullException(nameof(tx));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _actor = actor ?? throw new ArgumentNullException(nameof(actor));
         }
 
         public void AssignDuty(ServiceAssignment assignment, string reason)
@@ -225,24 +227,21 @@ namespace Dynamologio.Infrastructure.Services
             if (assignment == null) throw new ArgumentNullException(nameof(assignment));
             ValidateDuty(assignment);
 
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
+                assignment.CreatedAt = _clock.Now;
+                assignment.CreatedBy = _actor.GetActor();
+                assignment.ModifiedAt = _clock.Now;
+                assignment.ModifiedBy = _actor.GetActor();
+
                 _uow.ServiceAssignments.Insert(assignment);
                 _audit.LogAction(AuditAction.Create, "ServiceAssignment", assignment.Id.ToString(), reason ?? "Ανάθεση υπηρεσίας", null, assignment);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         public void CancelDuty(Guid assignmentId, string reason)
         {
-            _uow.BeginTransaction();
-            try
+            _tx.RunInTransaction(() =>
             {
                 var assignment = _uow.ServiceAssignments.GetById(assignmentId);
                 if (assignment == null) throw new InvalidOperationException($"ServiceAssignment {assignmentId} not found.");
@@ -250,15 +249,12 @@ namespace Dynamologio.Infrastructure.Services
                 var oldAssignment = new ServiceAssignment { Id = assignment.Id, IsCancelled = assignment.IsCancelled };
                 assignment.IsCancelled = true;
                 assignment.CancellationReason = reason ?? "Ακύρωση υπηρεσίας";
+                assignment.ModifiedAt = _clock.Now;
+                assignment.ModifiedBy = _actor.GetActor();
+
                 _uow.ServiceAssignments.Update(assignment);
                 _audit.LogAction(AuditAction.Cancel, "ServiceAssignment", assignment.Id.ToString(), reason ?? "Ακύρωση υπηρεσίας", oldAssignment, assignment);
-                _uow.Commit();
-            }
-            catch
-            {
-                _uow.Rollback();
-                throw;
-            }
+            });
         }
 
         private void ValidateDuty(ServiceAssignment assignment)

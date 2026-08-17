@@ -96,7 +96,13 @@ namespace Dynamologio.Tests
         private readonly DateTime _now;
         public TestClock(DateTime now) { _now = now; }
         public DateTime Now => _now;
+        public DateTime UtcNow => _now.ToUniversalTime();
         public DateTime Today => _now.Date;
+    }
+
+    public class TestCurrentActor : ICurrentActor
+    {
+        public string GetActor() => "TEST_USER";
     }
 
     public class DynamologioTests : IDisposable
@@ -364,9 +370,24 @@ namespace Dynamologio.Tests
         public void AT_TX_001_AuditFailureRollback_ForPersonnel()
         {
             var failingAudit = new FailingAuditService();
-            var svc = new PersonnelService(_uow, failingAudit);
+            var actor = new TestCurrentActor();
+            var tx = new LiteDbTransactionRunner(_uow);
+            var svc = new PersonnelService(_uow, failingAudit, tx, _clock, actor);
 
-            var person = new Personnel { LastName = "ΔΟΚΙΜΗ", FirstName = "ΑΠΟΤΥΧΙΑΣ" };
+            var rk = new Rank { Name = "Λγος", Category = PersonnelCategory.OfficerOrNco };
+            var un = new OrganisationUnit { Name = "ΛΧ" };
+            _uow.Ranks.Insert(rk);
+            _uow.OrganisationUnits.Insert(un);
+
+            var person = new Personnel 
+            { 
+                LastName = "ΔΟΚΙΜΗ", 
+                FirstName = "ΑΠΟΤΥΧΙΑΣ",
+                MilitaryServiceNumber = "12345",
+                RankId = rk.Id,
+                OrganisationUnitId = un.Id,
+                Category = PersonnelCategory.OfficerOrNco
+            };
 
             Assert.Throws<InvalidOperationException>(() =>
             {
@@ -381,9 +402,16 @@ namespace Dynamologio.Tests
         public void AT_TX_002_AuditFailureRollback_ForAbsence()
         {
             var failingAudit = new FailingAuditService();
-            var svc = new AbsenceService(_uow, failingAudit);
+            var actor = new TestCurrentActor();
+            var tx = new LiteDbTransactionRunner(_uow);
+            var svc = new AbsenceService(_uow, failingAudit, tx, _clock, actor);
 
-            var ev = new StatusEvent { PersonnelId = Guid.NewGuid(), StartAt = DateTime.Today, EndAtExclusive = DateTime.Today.AddDays(3) };
+            var p = new Personnel { LastName = "Δ", FirstName = "Α", MilitaryServiceNumber = "1", RankId = Guid.NewGuid(), OrganisationUnitId = Guid.NewGuid() };
+            _uow.Personnel.Insert(p);
+            var st = new StatusType { Name = "ΚΑ", Effect = StatusEffect.Absent };
+            _uow.StatusTypes.Insert(st);
+
+            var ev = new StatusEvent { PersonnelId = p.Id, StatusTypeId = st.Id, StartAt = DateTime.Today, EndAtExclusive = DateTime.Today.AddDays(3) };
 
             Assert.Throws<InvalidOperationException>(() =>
             {
@@ -398,11 +426,19 @@ namespace Dynamologio.Tests
         public void AT_TX_003_AuditFailureRollback_ForService()
         {
             var failingAudit = new FailingAuditService();
-            var svc = new DutyService(_uow, failingAudit);
+            var actor = new TestCurrentActor();
+            var tx = new LiteDbTransactionRunner(_uow);
+            var svc = new DutyService(_uow, failingAudit, tx, _clock, actor);
+
+            var p = new Personnel { LastName = "Δ", FirstName = "Α", MilitaryServiceNumber = "1", RankId = Guid.NewGuid(), OrganisationUnitId = Guid.NewGuid() };
+            _uow.Personnel.Insert(p);
+            var sv = new ServiceType { Name = "ΑΥ" };
+            _uow.ServiceTypes.Insert(sv);
 
             var duty = new ServiceAssignment
             {
-                PersonnelId = Guid.NewGuid(),
+                PersonnelId = p.Id,
+                ServiceTypeId = sv.Id,
                 ServiceDate = DateTime.Today,
                 StartDateTime = DateTime.Today.AddHours(8),
                 EndDateTime = DateTime.Today.AddHours(16),
@@ -668,9 +704,11 @@ namespace Dynamologio.Tests
                     var lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                     var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
                     var auditService = new AuditService(_uow);
-                    var personnelService = new PersonnelService(_uow, auditService);
-                    var absenceService = new AbsenceService(_uow, auditService);
-                    var dutyService = new DutyService(_uow, auditService);
+                    var actor = new TestCurrentActor();
+                    var tx = new LiteDbTransactionRunner(_uow);
+                    var personnelService = new PersonnelService(_uow, auditService, tx, _clock, actor);
+                    var absenceService = new AbsenceService(_uow, auditService, tx, _clock, actor);
+                    var dutyService = new DutyService(_uow, auditService, tx, _clock, actor);
 
                     var fileDialogService = new TestFileDialogService();
                     var notificationService = new TestNotificationService();

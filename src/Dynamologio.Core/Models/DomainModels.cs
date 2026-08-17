@@ -6,10 +6,10 @@ namespace Dynamologio.Core.Models
     public abstract class EntityBase
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
-        public string CreatedBy { get; set; } = "SYSTEM";
-        public DateTime ModifiedAt { get; set; } = DateTime.Now;
-        public string ModifiedBy { get; set; } = "SYSTEM";
+        public DateTime CreatedAt { get; set; }
+        public string CreatedBy { get; set; } = string.Empty;
+        public DateTime ModifiedAt { get; set; }
+        public string ModifiedBy { get; set; } = string.Empty;
     }
 
     /// <summary>
