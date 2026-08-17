@@ -3,29 +3,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{StaticResource CanvasBgBrush}">
 
-    <Grid Margin="16">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,14">
+        <!-- 1. Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Ιστορικό Ενεργειών &amp; Καταγραφές Ελέγχου (Audit Trail)" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
-                <TextBlock Text="Πλήρες χρονολόγιο καταχωρήσεων, ενημερώσεων, ακυρώσεων και εισαγωγών" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                <TextBlock Text="Ιστορικό" Style="{StaticResource TypePageTitle}" />
+                <TextBlock Text="Πλήρες αρχείο καταγραφής ενεργειών (Audit Trail) και τροποποιήσεων δεδομένων" Style="{StaticResource TypePageSubtitle}" />
             </StackPanel>
 
-            <Button Grid.Column="1" Content="Ανανέωση" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="32" />
+            <Button Grid.Column="1" Content="Ανανέωση" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="34" Padding="12,0" VerticalAlignment="Center" />
         </Grid>
 
-        <!-- Audit Table & Filter -->
-        <Border Grid.Row="1" Style="{StaticResource CardContainer}">
+        <!-- 2. Audit Table & Filter -->
+        <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -33,16 +33,16 @@
                 </Grid.RowDefinitions>
 
                 <!-- Search & Filters -->
-                <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid Grid.Row="0" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="180" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" />
-                    <ComboBox Grid.Column="2" SelectedValue="{Binding SelectedEntityType}" SelectedValuePath="Content" VerticalAlignment="Center">
-                        <ComboBoxItem Content="Όλα" IsSelected="True" />
+                    <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Height="34" />
+                    <ComboBox Grid.Column="2" SelectedValue="{Binding SelectedEntityType}" SelectedValuePath="Content" VerticalAlignment="Center" Height="34">
+                        <ComboBoxItem Content="Όλες οι οντότητες" IsSelected="True" />
                         <ComboBoxItem Content="Personnel" />
                         <ComboBoxItem Content="StatusEvent" />
                         <ComboBoxItem Content="ServiceAssignment" />
@@ -51,11 +51,11 @@
 
                 <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredEventsList}">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Ημερομηνία/Ώρα" Binding="{Binding CreatedAt, StringFormat='dd/MM/yyyy HH:mm:ss'}" Width="140" />
-                        <DataGridTextColumn Header="Χρήστης" Binding="{Binding Username}" Width="100" />
-                        <DataGridTextColumn Header="Ενέργεια" Binding="{Binding Action}" Width="90" />
-                        <DataGridTextColumn Header="Οντότητα" Binding="{Binding EntityType}" Width="110" />
-                        <DataGridTextColumn Header="Σύνοψη Μεταβολής" Binding="{Binding Summary}" Width="*" />
+                        <DataGridTextColumn Header="Ημερομηνία / Ώρα" Binding="{Binding CreatedAt, StringFormat='dd/MM/yyyy HH:mm:ss'}" Width="150" />
+                        <DataGridTextColumn Header="Χρήστης" Binding="{Binding Username}" Width="110" />
+                        <DataGridTextColumn Header="Ενέργεια" Binding="{Binding Action}" Width="95" />
+                        <DataGridTextColumn Header="Οντότητα" Binding="{Binding EntityType}" Width="130" />
+                        <DataGridTextColumn Header="Σύνοψη Μεταβολής" Binding="{Binding Summary}" Width="*" MinWidth="200" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

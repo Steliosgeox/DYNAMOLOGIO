@@ -3,21 +3,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{StaticResource CanvasBgBrush}">
 
-    <Grid Margin="16">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
-            <TextBlock Text="Οδηγός Εισαγωγής Προσωπικού από Excel" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
-            <TextBlock Text="Ανάλυση, αντιστοίχιση βαθμών/λόχων, έλεγχος διπλοεγγραφών και ασφαλής συναλλαγή εισαγωγής" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+        <!-- 1. Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Εισαγωγή Δεδομένων" Style="{StaticResource TypePageTitle}" />
+            <TextBlock Text="Ασφαλής εισαγωγή και ενημέρωση μητρώου προσωπικού από εξωτερικά αρχεία Excel" Style="{StaticResource TypePageSubtitle}" />
         </StackPanel>
 
-        <!-- File Selection & Stepper Bar -->
-        <Border Grid.Row="1" Style="{StaticResource CardContainer}" Margin="0,0,0,14">
+        <!-- 2. File Selection & Stepper Bar -->
+        <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -26,57 +26,56 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                    <TextBlock Text="Επιλεγμένο Αρχείο Excel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
-                    <TextBox Text="{Binding SelectedFilePath}" IsReadOnly="True" />
+                    <TextBlock Text="ΕΠΙΛΕΓΜΕΝΟ ΑΡΧΕΙΟ EXCEL" Style="{StaticResource TypeCaption}" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding SelectedFilePath}" IsReadOnly="True" Height="34" />
                 </StackPanel>
 
-                <Button Grid.Column="1" Content="Αναζήτηση Αρχείου..." Command="{Binding BrowseFileCommand}" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" Height="32" Margin="0,0,8,0" />
-                <Button Grid.Column="2" Content="Εκτέλεση Εισαγωγής" Command="{Binding CommitImportCommand}" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" Height="32" />
+                <Button Grid.Column="1" Content="Αναζήτηση Αρχείου..." Command="{Binding BrowseFileCommand}" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" Height="34" Padding="12,0" Margin="0,0,8,0" />
+                <Button Grid.Column="2" Content="Εκτέλεση Εισαγωγής" Command="{Binding CommitImportCommand}" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" Height="34" Padding="14,0" />
             </Grid>
         </Border>
 
-        <!-- Preview Table & Status -->
-        <Border Grid.Row="2" Style="{StaticResource CardContainer}">
+        <!-- 3. Preview Table & Status -->
+        <Border Grid.Row="2" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Summary Bar -->
-                <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid Grid.Row="0" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="{Binding StatusMessage, FallbackValue='Επιλέξτε αρχείο Excel για προεπισκόπηση.'}" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding StatusMessage, FallbackValue='Επιλέξτε αρχείο Excel για προεπισκόπηση.'}" Style="{StaticResource TypeSectionTitle}" VerticalAlignment="Center" />
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="{Binding PreviewReport, Converter={StaticResource NullToVisConverter}}">
                         <Border Background="{StaticResource AccentSubduedBrush}" CornerRadius="4" Padding="8,4" Margin="0,0,6,0">
-                            <TextBlock Text="{Binding PreviewReport.NewCount, StringFormat='Νέες: {0}'}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" />
+                            <TextBlock Text="{Binding PreviewReport.NewCount, StringFormat='Νέες: {0}'}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" />
                         </Border>
                         <Border Background="#FEF3C7" CornerRadius="4" Padding="8,4" Margin="0,0,6,0">
-                            <TextBlock Text="{Binding PreviewReport.UpdateCount, StringFormat='Ενημερώσεις: {0}'}" FontSize="11" FontWeight="Bold" Foreground="#92400E" />
+                            <TextBlock Text="{Binding PreviewReport.UpdateCount, StringFormat='Ενημερώσεις: {0}'}" FontSize="11.5" FontWeight="Bold" Foreground="#92400E" />
                         </Border>
                         <Border Background="#FEE2E2" CornerRadius="4" Padding="8,4">
-                            <TextBlock Text="{Binding PreviewReport.ErrorCount, StringFormat='Σφάλματα: {0}'}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DangerBrush}" />
+                            <TextBlock Text="{Binding PreviewReport.ErrorCount, StringFormat='Σφάλματα: {0}'}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource DangerBrush}" />
                         </Border>
                     </StackPanel>
                 </Grid>
 
-                <!-- DataGrid Preview -->
+                <!-- DataGrid Preview with Light Neutral Header -->
                 <DataGrid Grid.Row="1" ItemsSource="{Binding PreviewRows}">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Γραμμή" Binding="{Binding RowIndex}" Width="60" />
+                        <DataGridTextColumn Header="Γραμμή" Binding="{Binding RowIndex}" Width="65" />
                         <DataGridTextColumn Header="Ενέργεια" Binding="{Binding DisplayActionText}" Width="120" />
                         <DataGridTextColumn Header="ΑΣΜ" Binding="{Binding MilitaryServiceNumber}" Width="85" />
                         <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="85" />
-                        <DataGridTextColumn Header="Επώνυμο" Binding="{Binding LastName}" Width="*" />
-                        <DataGridTextColumn Header="Όνομα" Binding="{Binding FirstName}" Width="*" />
-                        <DataGridTextColumn Header="Μονάδα/Λόχος" Binding="{Binding UnitName}" Width="110" />
-                        <DataGridTextColumn Header="Διαφορές (Diff)" Binding="{Binding FullDiffSummary}" Width="1.5*" />
+                        <DataGridTextColumn Header="Επώνυμο" Binding="{Binding LastName}" Width="*" MinWidth="120" />
+                        <DataGridTextColumn Header="Όνομα" Binding="{Binding FirstName}" Width="*" MinWidth="120" />
+                        <DataGridTextColumn Header="Μονάδα / Λόχος" Binding="{Binding UnitName}" Width="120" />
+                        <DataGridTextColumn Header="Διαφορές (Diff)" Binding="{Binding FullDiffSummary}" Width="1.5*" MinWidth="180" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

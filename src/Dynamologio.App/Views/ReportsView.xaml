@@ -3,32 +3,32 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{StaticResource CanvasBgBrush}">
 
-    <Grid Margin="16">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,14">
+        <!-- 1. Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Κέντρο Επίσημων Αναφορών &amp; Εξαγωγών" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
-                <TextBlock Text="Παραγωγή επίσημων εγγράφων δύναμης, ονομαστικών καταστάσεων και προγραμμάτων υπηρεσίας" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                <TextBlock Text="Αναφορές" Style="{StaticResource TypePageTitle}" />
+                <TextBlock Text="Παραγωγή επίσημων αναφορών δύναμης, ονομαστικών καταστάσεων και εξαγωγή αρχείων" Style="{StaticResource TypePageSubtitle}" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,8,0">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource PrimaryButton}" Height="34" Padding="14,0" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{StaticResource IconImportGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
                         <TextBlock Text="Εξαγωγή Excel" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
-                <Button Command="{Binding PrintReportCommand}" Style="{StaticResource SecondaryButton}" Height="34">
+                <Button Command="{Binding PrintReportCommand}" Style="{StaticResource SecondaryButton}" Height="34" Padding="14,0">
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{StaticResource IconPrintGeometry}" Fill="{StaticResource TextPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
                         <TextBlock Text="Εκτύπωση" VerticalAlignment="Center" />
@@ -37,27 +37,27 @@
             </StackPanel>
         </Grid>
 
-        <!-- Main Content -->
+        <!-- 2. Main Content -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="340" MinWidth="300" MaxWidth="380" />
-                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- Left: Report Type & Scope Parameters -->
-            <Border Grid.Column="0" Style="{StaticResource CardContainer}">
+            <Border Grid.Column="0" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="Επιλογή Αναφοράς &amp; Παραμέτρων" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,12" />
+                        <TextBlock Text="Παράμετροι Αναφοράς" Style="{StaticResource TypeSectionTitle}" Margin="0,0,0,12" />
 
                         <!-- Report Catalog List -->
-                        <TextBlock Text="Τύπος Αναφοράς *" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <TextBlock Text="Τύπος Αναφοράς *" Style="{StaticResource TypeCaption}" Margin="0,0,0,4" />
                         <ListBox ItemsSource="{Binding AvailableReports}" SelectedItem="{Binding SelectedReport}" Height="150" Margin="0,0,0,12">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Margin="4,2">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                    <StackPanel Margin="4,3">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" />
                                         <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -65,20 +65,20 @@
                         </ListBox>
 
                         <!-- Date -->
-                        <TextBlock Text="Ημερομηνία Αναφοράς *" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <DatePicker SelectedDate="{Binding SelectedDate}" Margin="0,0,0,12" />
+                        <TextBlock Text="Ημερομηνία Αναφοράς *" Style="{StaticResource TypeCaption}" Margin="0,0,0,4" />
+                        <DatePicker SelectedDate="{Binding SelectedDate}" Height="34" Margin="0,0,0,12" />
 
                         <!-- Scope -->
-                        <TextBlock Text="Μονάδα / Λόχος" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <ComboBox ItemsSource="{Binding UnitsList}" SelectedItem="{Binding SelectedUnit}" DisplayMemberPath="Name" Margin="0,0,0,16" />
+                        <TextBlock Text="Μονάδα / Λόχος" Style="{StaticResource TypeCaption}" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding UnitsList}" SelectedItem="{Binding SelectedUnit}" DisplayMemberPath="Name" Height="34" Margin="0,0,0,16" />
 
-                        <Button Content="Ανανέωση Προεπισκόπησης" Command="{Binding RefreshPreviewCommand}" Style="{StaticResource SecondaryButton}" Height="32" />
+                        <Button Content="Ανανέωση Προεπισκόπησης" Command="{Binding RefreshPreviewCommand}" Style="{StaticResource SecondaryButton}" Height="34" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
 
             <!-- Right: Preview Surface -->
-            <Border Grid.Column="2" Style="{StaticResource CardContainer}">
+            <Border Grid.Column="2" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -86,15 +86,15 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="{Binding SelectedReport.Title, FallbackValue='Προεπισκόπηση Αναφοράς'}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,4" />
-                    <TextBlock Grid.Row="1" Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10" />
+                    <TextBlock Grid.Row="0" Text="{Binding SelectedReport.Title, FallbackValue='Προεπισκόπηση Αναφοράς'}" Style="{StaticResource TypeSectionTitle}" Margin="0,0,0,2" />
+                    <TextBlock Grid.Row="1" Text="{Binding StatusMessage}" Style="{StaticResource TypeCaption}" Margin="0,0,0,12" />
 
                     <!-- Tabbed Preview Content -->
-                    <TabControl Grid.Row="2" BorderThickness="0" Background="Transparent">
+                    <TabControl Grid.Row="2">
                         <TabItem Header="Σύνοψη Δύναμης">
-                            <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="14" Margin="0,10,0,0">
+                            <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,10,0,0">
                                 <StackPanel>
-                                    <Grid Margin="0,0,0,12">
+                                    <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
@@ -102,22 +102,22 @@
                                         </Grid.ColumnDefinitions>
 
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Συνολική Δύναμη:" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-                                            <TextBlock Text="{Binding PreviewSnapshot.TotalActiveStrength}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
+                                            <TextBlock Text="ΣΥΝΟΛΙΚΗ ΔΥΝΑΜΗ" Style="{StaticResource TypeKpiLabel}" />
+                                            <TextBlock Text="{Binding PreviewSnapshot.TotalActiveStrength}" Style="{StaticResource TypeKpiValue}" Margin="0,2,0,0" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="Παρόντες:" FontSize="11" Foreground="{StaticResource PresentBrush}" />
-                                            <TextBlock Text="{Binding PreviewSnapshot.TotalPresent}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource PresentBrush}" />
+                                            <TextBlock Text="ΠΑΡΟΝΤΕΣ" Style="{StaticResource TypeKpiLabel}" />
+                                            <TextBlock Text="{Binding PreviewSnapshot.TotalPresent}" Style="{StaticResource TypeKpiValue}" Foreground="{StaticResource PresentBrush}" Margin="0,2,0,0" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="2">
-                                            <TextBlock Text="Απόντες:" FontSize="11" Foreground="{StaticResource AbsentBrush}" />
-                                            <TextBlock Text="{Binding PreviewSnapshot.TotalAbsent}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AbsentBrush}" />
+                                            <TextBlock Text="ΑΠΟΝΤΕΣ" Style="{StaticResource TypeKpiLabel}" />
+                                            <TextBlock Text="{Binding PreviewSnapshot.TotalAbsent}" Style="{StaticResource TypeKpiValue}" Foreground="{StaticResource AbsentBrush}" Margin="0,2,0,0" />
                                         </StackPanel>
                                     </Grid>
 
-                                    <TextBlock Text="Κατανομή Ανά Κατηγορία:" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                    <TextBlock Text="{Binding PreviewSnapshot.OfficersAndNcosActive, StringFormat='• Στελέχη: {0}'}" />
-                                    <TextBlock Text="{Binding PreviewSnapshot.ConscriptsActive, StringFormat='• Οπλίτες: {0}'}" />
+                                    <TextBlock Text="Κατανομή Ανά Κατηγορία:" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                                    <TextBlock Text="{Binding PreviewSnapshot.OfficersAndNcosActive, StringFormat='• Στελέχη: {0}'}" FontSize="12.5" Margin="0,2" />
+                                    <TextBlock Text="{Binding PreviewSnapshot.ConscriptsActive, StringFormat='• Οπλίτες: {0}'}" FontSize="12.5" Margin="0,2" />
                                 </StackPanel>
                             </Border>
                         </TabItem>
@@ -126,9 +126,9 @@
                             <Grid Margin="0,10,0,0">
                                 <DataGrid ItemsSource="{Binding PreviewSnapshot.AbsentPersonnel}">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Βαθμός" Binding="{Binding Rank.ShortName}" Width="80" />
-                                        <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding Person.FullName}" Width="*" />
-                                        <DataGridTextColumn Header="Αιτιολογία" Binding="{Binding ActiveStatusType.Name}" Width="120" />
+                                        <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="80" />
+                                        <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding FullName}" Width="*" MinWidth="150" />
+                                        <DataGridTextColumn Header="Αιτιολογία" Binding="{Binding StatusDisplayLabel}" Width="130" />
                                         <DataGridTextColumn Header="Επιστροφή" Binding="{Binding ReturnDisplayLabel}" Width="95" />
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -139,9 +139,9 @@
                             <Grid Margin="0,10,0,0">
                                 <DataGrid ItemsSource="{Binding PreviewSnapshot.PresentPersonnel}">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Βαθμός" Binding="{Binding Rank.ShortName}" Width="80" />
-                                        <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding Person.FullName}" Width="*" />
-                                        <DataGridTextColumn Header="Μονάδα/Λόχος" Binding="{Binding Unit.Name}" Width="120" />
+                                        <DataGridTextColumn Header="Βαθμός" Binding="{Binding RankName}" Width="80" />
+                                        <DataGridTextColumn Header="Ονοματεπώνυμο" Binding="{Binding FullName}" Width="*" MinWidth="150" />
+                                        <DataGridTextColumn Header="Μονάδα / Λόχος" Binding="{Binding UnitName}" Width="140" />
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </Grid>

@@ -4,7 +4,7 @@
              Background="{StaticResource CanvasBgBrush}">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="16">
+        <Grid Margin="20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -12,53 +12,53 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <StackPanel Grid.Row="0" Margin="0,0,0,14">
-                <TextBlock Text="Ρυθμίσεις Συστήματος &amp; Συντήρηση Βάσης" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HeaderDarkBrush}" />
-                <TextBlock Text="Διαμόρφωση στοιχείων μονάδας, λήψη και επαναφορά αντιγράφων ασφαλείας" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+            <!-- 1. Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Text="Ρυθμίσεις" Style="{StaticResource TypePageTitle}" />
+                <TextBlock Text="Διαμόρφωση στοιχείων μονάδας, διαχείριση κρυπτογραφημένων αντιγράφων και διαγνωστικά" Style="{StaticResource TypePageSubtitle}" />
             </StackPanel>
 
-            <!-- Deployment Unit Configuration -->
-            <Border Grid.Row="1" Style="{StaticResource CardContainer}" Margin="0,0,0,14">
+            <!-- 2. Deployment Unit Configuration -->
+            <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="Στοιχεία Εγκατάστασης &amp; Μονάδας" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,10" />
+                    <TextBlock Text="Στοιχεία Εγκατάστασης &amp; Μονάδας" Style="{StaticResource TypeSectionTitle}" Margin="0,0,0,12" />
 
-                    <Grid Margin="0,0,0,10">
+                    <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="16" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Ονομασία Μονάδας / Σχηματισμού *" FontWeight="SemiBold" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding UnitName, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Ονομασία Μονάδας / Σχηματισμού *" Style="{StaticResource TypeCaption}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding UnitName, UpdateSourceTrigger=PropertyChanged}" Height="34" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="Ονομασία Γραφείου / Τμήματος *" FontWeight="SemiBold" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding OfficeName, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Ονομασία Γραφείου / Τμήματος *" Style="{StaticResource TypeCaption}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding OfficeName, UpdateSourceTrigger=PropertyChanged}" Height="34" />
                         </StackPanel>
                     </Grid>
 
-                    <Button Content="Αποθήκευση Στοιχείων Μονάδας" Command="{Binding SaveUnitSettingsCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Height="32" />
+                    <Button Content="Αποθήκευση Στοιχείων Μονάδας" Command="{Binding SaveUnitSettingsCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Height="34" Padding="14,0" />
                 </StackPanel>
             </Border>
 
-            <!-- Backup & Restore -->
-            <Border Grid.Row="2" Style="{StaticResource CardContainer}" Margin="0,0,0,14">
+            <!-- 3. Backup & Restore -->
+            <Border Grid.Row="2" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="Αντίγραφα Ασφαλείας &amp; Επαναφορά Δεδομένων" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,10" />
-                    <TextBlock Text="Δημιουργήστε ένα ZIP αντίγραφο ασφαλείας με έλεγχο ακεραιότητας SHA-256 ή επαναφέρετε προηγούμενο πιστοποιημένο αντίγραφο." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12" TextWrapping="Wrap" />
+                    <TextBlock Text="Αντίγραφα Ασφαλείας &amp; Επαναφορά Δεδομένων" Style="{StaticResource TypeSectionTitle}" Margin="0,0,0,8" />
+                    <TextBlock Text="Δημιουργία κρυπτογραφημένου ZIP αντιγράφου ασφαλείας με έλεγχο ακεραιότητας SHA-256 / HMAC ή επαναφορά προηγούμενου αντιγράφου." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,14" TextWrapping="Wrap" />
 
                     <StackPanel Orientation="Horizontal">
-                        <Button Command="{Binding CreateBackupCommand}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,10,0">
+                        <Button Command="{Binding CreateBackupCommand}" Style="{StaticResource PrimaryButton}" Height="34" Padding="14,0" Margin="0,0,10,0">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconSaveGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
                                 <TextBlock Text="Δημιουργία Αντιγράφου Ασφαλείας" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding RestoreBackupCommand}" Style="{StaticResource DangerButton}" Height="34">
+                        <Button Command="{Binding RestoreBackupCommand}" Style="{StaticResource DangerButton}" Height="34" Padding="14,0">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconHistoryGeometry}" Fill="White" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
                                 <TextBlock Text="Επαναφορά από Αντίγραφο" VerticalAlignment="Center" />
@@ -68,13 +68,13 @@
                 </StackPanel>
             </Border>
 
-            <!-- Diagnostics -->
-            <Border Grid.Row="3" Style="{StaticResource CardContainer}">
+            <!-- 4. Diagnostics -->
+            <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
                 <StackPanel>
-                    <TextBlock Text="Τεχνικά Διαγνωστικά" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource HeaderDarkBrush}" Margin="0,0,0,10" />
-                    <TextBlock Text="Εξαγωγή πακέτου τεχνικών διαγνωστικών για offline υποστήριξη και τεχνικό έλεγχο." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12" />
+                    <TextBlock Text="Τεχνικά Διαγνωστικά" Style="{StaticResource TypeSectionTitle}" Margin="0,0,0,8" />
+                    <TextBlock Text="Εξαγωγή ανωνυμοποιημένου πακέτου τεχνικών διαγνωστικών για offline υποστήριξη και τεχνικό έλεγχο." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,14" />
 
-                    <Button Command="{Binding ExportDiagnosticsCommand}" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Height="34">
+                    <Button Command="{Binding ExportDiagnosticsCommand}" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Height="34" Padding="14,0">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSettingsGeometry}" Fill="{StaticResource TextPrimaryBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
                             <TextBlock Text="Εξαγωγή Πακέτου Διαγνωστικών" VerticalAlignment="Center" />
