@@ -10,6 +10,7 @@ using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Core.Projections;
 using Dynamologio.ImportExport.Excel;
+using Newtonsoft.Json;
 
 namespace Dynamologio.Reporting.Services
 {
@@ -26,7 +27,8 @@ namespace Dynamologio.Reporting.Services
         Verified,
         Missing,
         ShaMismatch,
-        Unmapped
+        Unmapped,
+        Unverified
     }
 
     public class ReportGenerationRequest
@@ -34,8 +36,7 @@ namespace Dynamologio.Reporting.Services
         public ReportType Type { get; set; } = ReportType.DailyDynamologio;
         public DateTime AsOfTimestamp { get; set; } = DateTime.Today;
         public Guid? OrganisationUnitId { get; set; }
-        public string UnitTitle { get; set; } = "123 ΤΑΓΜΑ ΠΕΖΙΚΟΥ - 1ο ΓΡΑΦΕΙΟ";
-        public string CustomTemplatePath { get; set; }
+        public string UnitTitle { get; set; } = "ΕΛΛΗΝΙΚΟΣ ΣΤΡΑΤΟΣ";
     }
 
     public interface IReportGeneratorService
@@ -93,10 +94,17 @@ namespace Dynamologio.Reporting.Services
             templatePath = string.Empty;
 
             var tpl = _uow.ReportTemplates.Find(t => t.IsActive).FirstOrDefault();
-            if (tpl != null && !string.IsNullOrWhiteSpace(tpl.Sha256Hash))
+            if (tpl == null)
             {
-                expectedSha = tpl.Sha256Hash;
+                return TemplateVerificationStatus.Unverified;
             }
+
+            if (string.IsNullOrWhiteSpace(tpl.Sha256Hash))
+            {
+                return TemplateVerificationStatus.Unverified;
+            }
+
+            expectedSha = tpl.Sha256Hash.Trim();
 
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
             if (string.IsNullOrEmpty(appData)) appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -117,9 +125,14 @@ namespace Dynamologio.Reporting.Services
 
             actualSha = ComputeSha256(templatePath);
 
-            if (!string.IsNullOrEmpty(expectedSha) && !string.Equals(actualSha, expectedSha, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(actualSha, expectedSha, StringComparison.OrdinalIgnoreCase))
             {
                 return TemplateVerificationStatus.ShaMismatch;
+            }
+
+            if (string.IsNullOrWhiteSpace(tpl.CellMappingJson) || tpl.CellMappingJson == "{}")
+            {
+                return TemplateVerificationStatus.Unmapped;
             }
 
             return TemplateVerificationStatus.Verified;
@@ -127,34 +140,48 @@ namespace Dynamologio.Reporting.Services
 
         public string ExportToExcel(ReportGenerationRequest request, string outputFilePath)
         {
-            var status = CheckTemplateStatus(out string templatePath, out string expectedSha, out string actualSha);
-            if (status == TemplateVerificationStatus.Missing)
-            {
-                throw new InvalidOperationException("Δεν βρέθηκε αρχείο επίσημου προτύπου (Missing template).");
-            }
-            if (status == TemplateVerificationStatus.ShaMismatch)
-            {
-                throw new InvalidOperationException($"Ασυμφωνία SHA-256 προτύπου Excel. Αναμενόμενο: {expectedSha}, Πραγματικό: {actualSha}");
-            }
+            if (request == null) throw new ArgumentNullException(nameof(request));
 
             var snapshot = PrepareSnapshot(request);
+            string title = !string.IsNullOrWhiteSpace(request.UnitTitle) ? request.UnitTitle : "ΕΛΛΗΝΙΚΟΣ ΣΤΡΑΤΟΣ";
 
             switch (request.Type)
             {
                 case ReportType.DailyDynamologio:
-                    _templateWriter.GenerateDynamologioWorkbook(templatePath, outputFilePath, snapshot, request.UnitTitle);
+                    var status = CheckTemplateStatus(out string templatePath, out string expectedSha, out string actualSha);
+                    if (status == TemplateVerificationStatus.Missing)
+                    {
+                        throw new InvalidOperationException("Δεν βρέθηκε αρχείο επίσημου προτύπου (Missing template).");
+                    }
+                    if (status == TemplateVerificationStatus.ShaMismatch)
+                    {
+                        throw new InvalidOperationException($"Ασυμφωνία SHA-256 προτύπου Excel. Αναμενόμενο: {expectedSha}, Πραγματικό: {actualSha}");
+                    }
+                    if (status == TemplateVerificationStatus.Unverified || status == TemplateVerificationStatus.Unmapped)
+                    {
+                        throw new InvalidOperationException("Το πρότυπο δεν έχει επαληθευτεί ή δεν έχει αντιστοίχιση.");
+                    }
+
+                    TemplateCellMapping mapping = null;
+                    var tpl = _uow.ReportTemplates.Find(t => t.IsActive).FirstOrDefault();
+                    if (tpl != null && !string.IsNullOrWhiteSpace(tpl.CellMappingJson))
+                    {
+                        try { mapping = JsonConvert.DeserializeObject<TemplateCellMapping>(tpl.CellMappingJson); } catch { }
+                    }
+
+                    _templateWriter.GenerateDynamologioWorkbook(templatePath, outputFilePath, snapshot, title, mapping);
                     break;
+
                 case ReportType.AbsentPersonnel:
-                    _templateWriter.GenerateDynamologioWorkbook(templatePath, outputFilePath, snapshot, $"{request.UnitTitle} - ΚΑΤΑΣΤΑΣΗ ΑΠΟΝΤΩΝ");
+                    _templateWriter.GenerateAbsentWorkbook(outputFilePath, snapshot, title);
                     break;
+
                 case ReportType.PresentPersonnel:
-                    _templateWriter.GenerateDynamologioWorkbook(templatePath, outputFilePath, snapshot, $"{request.UnitTitle} - ΚΑΤΑΣΤΑΣΗ ΠΑΡΟΝΤΩΝ");
+                    _templateWriter.GeneratePresentWorkbook(outputFilePath, snapshot, title);
                     break;
+
                 case ReportType.ServiceRoster:
-                    _templateWriter.GenerateDynamologioWorkbook(templatePath, outputFilePath, snapshot, $"{request.UnitTitle} - ΠΡΟΓΡΑΜΜΑ ΥΠΗΡΕΣΙΩΝ");
-                    break;
-                default:
-                    _templateWriter.GenerateDynamologioWorkbook(templatePath, outputFilePath, snapshot, request.UnitTitle);
+                    _templateWriter.GenerateServiceWorkbook(outputFilePath, snapshot, title);
                     break;
             }
 
@@ -166,69 +193,141 @@ namespace Dynamologio.Reporting.Services
             var snapshot = PrepareSnapshot(request);
             var doc = new FlowDocument
             {
-                FontFamily = new FontFamily("Segoe UI, Arial"),
-                FontSize = 12,
                 PagePadding = new Thickness(40),
-                ColumnWidth = 800
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 12
             };
 
-            // Header Title
-            doc.Blocks.Add(new Paragraph(new Run(request.UnitTitle))
+            string title = !string.IsNullOrWhiteSpace(request.UnitTitle) ? request.UnitTitle : "ΕΛΛΗΝΙΚΟΣ ΣΤΡΑΤΟΣ";
+
+            var header = new Paragraph(new Bold(new Run(title)))
             {
                 FontSize = 16,
-                FontWeight = FontWeights.Bold,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 4)
-            });
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            doc.Blocks.Add(header);
 
-            string reportTitle = request.Type switch
+            string subtitleText = request.Type switch
             {
-                ReportType.AbsentPersonnel => "ΟΝΟΜΑΣΤΙΚΗ ΚΑΤΑΣΤΑΣΗ ΑΠΟΝΤΩΝ",
-                ReportType.PresentPersonnel => "ΟΝΟΜΑΣΤΙΚΗ ΚΑΤΑΣΤΑΣΗ ΠΑΡΟΝΤΩΝ",
-                ReportType.ServiceRoster => "ΗΜΕΡΗΣΙΟ ΠΡΟΓΡΑΜΜΑ ΥΠΗΡΕΣΙΩΝ",
-                _ => "ΗΜΕΡΗΣΙΟ ΔΥΝΑΜΟΛΟΓΙΟ"
+                ReportType.DailyDynamologio => $"ΗΜΕΡΗΣΙΟ ΔΥΝΑΜΟΛΟΓΙΟ — {snapshot.AsOfTimestamp:dd/MM/yyyy}",
+                ReportType.AbsentPersonnel => $"ΚΑΤΑΣΤΑΣΗ ΑΠΟΝΤΩΝ ΠΡΟΣΩΠΙΚΟΥ — {snapshot.AsOfTimestamp:dd/MM/yyyy}",
+                ReportType.PresentPersonnel => $"ΚΑΤΑΣΤΑΣΗ ΠΑΡΟΝΤΩΝ ΠΡΟΣΩΠΙΚΟΥ — {snapshot.AsOfTimestamp:dd/MM/yyyy}",
+                ReportType.ServiceRoster => $"ΠΙΝΑΚΑΣ ΥΠΗΡΕΣΙΩΝ & ΚΑΘΗΚΟΝΤΩΝ — {snapshot.AsOfTimestamp:dd/MM/yyyy}",
+                _ => $"ΑΝΑΦΟΡΑ ΔΥΝΑΜΗΣ — {snapshot.AsOfTimestamp:dd/MM/yyyy}"
             };
 
-            doc.Blocks.Add(new Paragraph(new Run($"{reportTitle} - {snapshot.AsOfTimestamp:dd/MM/yyyy}"))
+            var subtitle = new Paragraph(new Run(subtitleText))
             {
-                FontSize = 14,
+                FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 TextAlignment = TextAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 16)
-            });
+            };
+            doc.Blocks.Add(subtitle);
 
-            // Table Content
-            var table = new Table { CellSpacing = 0, BorderBrush = Brushes.Black, BorderThickness = new Thickness(1) };
-            table.Columns.Add(new TableColumn { Width = new GridLength(100) });
-            table.Columns.Add(new TableColumn { Width = new GridLength(200) });
-            table.Columns.Add(new TableColumn { Width = new GridLength(150) });
-            table.Columns.Add(new TableColumn { Width = new GridLength(120) });
-
+            var table = new Table();
             var rowGroup = new TableRowGroup();
-            var headerRow = new TableRow { Background = Brushes.LightGray };
-            headerRow.Cells.Add(new TableCell(new Paragraph(new Run("Βαθμός")) { FontWeight = FontWeights.Bold }));
-            headerRow.Cells.Add(new TableCell(new Paragraph(new Run("Ονοματεπώνυμο")) { FontWeight = FontWeights.Bold }));
-            headerRow.Cells.Add(new TableCell(new Paragraph(new Run("Υπομονάδα/Λόχος")) { FontWeight = FontWeights.Bold }));
-            headerRow.Cells.Add(new TableCell(new Paragraph(new Run("Κατάσταση")) { FontWeight = FontWeights.Bold }));
-            rowGroup.Rows.Add(headerRow);
+            table.RowGroups.Add(rowGroup);
 
-            var listToDisplay = request.Type == ReportType.AbsentPersonnel
-                ? snapshot.AbsentPersonnel
-                : snapshot.PresentPersonnel;
-
-            foreach (var p in listToDisplay.Take(50))
+            switch (request.Type)
             {
-                var row = new TableRow();
-                row.Cells.Add(new TableCell(new Paragraph(new Run(p.Rank?.ShortName ?? "-"))));
-                row.Cells.Add(new TableCell(new Paragraph(new Run(p.Person?.FullName ?? "-"))));
-                row.Cells.Add(new TableCell(new Paragraph(new Run(p.Unit?.Name ?? "-"))));
-                row.Cells.Add(new TableCell(new Paragraph(new Run(p.StatusDisplayLabel ?? "-"))));
-                rowGroup.Rows.Add(row);
+                case ReportType.ServiceRoster:
+                    table.Columns.Add(new TableColumn { Width = new GridLength(40) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(100) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(180) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(140) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(120) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(100) });
+
+                    var headerRowSvc = new TableRow();
+                    headerRowSvc.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("Α/Α")))));
+                    headerRowSvc.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΒΑΘΜΟΣ")))));
+                    headerRowSvc.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΟΝΟΜΑΤΕΠΩΝΥΜΟ")))));
+                    headerRowSvc.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΥΠΗΡΕΣΙΑ")))));
+                    headerRowSvc.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΤΟΠΟΘΕΣΙΑ")))));
+                    headerRowSvc.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΩΡΑΡΙΟ")))));
+                    rowGroup.Rows.Add(headerRowSvc);
+
+                    var svcPersonnel = snapshot.PresentPersonnel.Where(p => p.ActiveServiceAssignment != null).OrderBy(p => p.Rank?.SortOrder ?? 99).ToList();
+                    for (int i = 0; i < svcPersonnel.Count; i++)
+                    {
+                        var p = svcPersonnel[i];
+                        var row = new TableRow();
+                        row.Cells.Add(new TableCell(new Paragraph(new Run((i + 1).ToString()))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Rank?.ShortName ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Person?.FullName ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.ActiveServiceType?.Name ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.ActiveServiceAssignment?.DutyLocation ?? "-"))));
+                        string times = $"{p.ActiveServiceAssignment?.StartDateTime:HH:mm} - {p.ActiveServiceAssignment?.EndDateTime:HH:mm}";
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(times))));
+                        rowGroup.Rows.Add(row);
+                    }
+                    break;
+
+                case ReportType.AbsentPersonnel:
+                    table.Columns.Add(new TableColumn { Width = new GridLength(40) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(100) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(180) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(140) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(100) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(120) });
+
+                    var headerRowAbs = new TableRow();
+                    headerRowAbs.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("Α/Α")))));
+                    headerRowAbs.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΒΑΘΜΟΣ")))));
+                    headerRowAbs.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΟΝΟΜΑΤΕΠΩΝΥΜΟ")))));
+                    headerRowAbs.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΑΙΤΙΟΛΟΓΙΑ")))));
+                    headerRowAbs.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΕΠΙΣΤΡΟΦΗ")))));
+                    headerRowAbs.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΕΓΓΡΑΦΟ")))));
+                    rowGroup.Rows.Add(headerRowAbs);
+
+                    var absents = snapshot.AbsentPersonnel.OrderBy(p => p.Rank?.SortOrder ?? 99).ToList();
+                    for (int i = 0; i < absents.Count; i++)
+                    {
+                        var p = absents[i];
+                        var row = new TableRow();
+                        row.Cells.Add(new TableCell(new Paragraph(new Run((i + 1).ToString()))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Rank?.ShortName ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Person?.FullName ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.ActiveStatusType?.Name ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.ExpectedReturnDate?.ToString("dd/MM/yyyy") ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.ActiveStatusEvent?.ReferenceDocument ?? "-"))));
+                        rowGroup.Rows.Add(row);
+                    }
+                    break;
+
+                default: // DailyDynamologio / PresentPersonnel
+                    table.Columns.Add(new TableColumn { Width = new GridLength(40) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(100) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(180) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(140) });
+                    table.Columns.Add(new TableColumn { Width = new GridLength(120) });
+
+                    var headerRow = new TableRow();
+                    headerRow.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("Α/Α")))));
+                    headerRow.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΒΑΘΜΟΣ")))));
+                    headerRow.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΟΝΟΜΑΤΕΠΩΝΥΜΟ")))));
+                    headerRow.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΥΠΟΜΟΝΑΔΑ")))));
+                    headerRow.Cells.Add(new TableCell(new Paragraph(new Bold(new Run("ΚΑΤΑΣΤΑΣΗ")))));
+                    rowGroup.Rows.Add(headerRow);
+
+                    var allList = snapshot.PresentPersonnel.OrderBy(p => p.Rank?.SortOrder ?? 99).ToList();
+                    for (int i = 0; i < allList.Count; i++)
+                    {
+                        var p = allList[i];
+                        var row = new TableRow();
+                        row.Cells.Add(new TableCell(new Paragraph(new Run((i + 1).ToString()))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Rank?.ShortName ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Person?.FullName ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.Unit?.Name ?? "-"))));
+                        row.Cells.Add(new TableCell(new Paragraph(new Run(p.StatusDisplayLabel ?? "-"))));
+                        rowGroup.Rows.Add(row);
+                    }
+                    break;
             }
 
-            table.RowGroups.Add(rowGroup);
             doc.Blocks.Add(table);
-
             return doc;
         }
 
