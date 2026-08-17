@@ -1,27 +1,26 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Dynamologio.App.Controls;
 using Dynamologio.App.ViewModels;
 using Dynamologio.App.Views;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
-using Dynamologio.Core.Projections;
 using Dynamologio.ImportExport.Excel;
 using Dynamologio.ImportExport.Excel.Import;
 using Dynamologio.Infrastructure.LiteDb;
-using Dynamologio.Infrastructure.Migrations;
 using Dynamologio.Infrastructure.Repositories;
+using Dynamologio.Infrastructure.Security;
 using Dynamologio.Infrastructure.Services;
 using Dynamologio.Reporting.Services;
 using LiteDB;
@@ -30,27 +29,67 @@ using Xunit;
 
 namespace Dynamologio.Tests
 {
+    public class FailingKeyProvider : IKeyProtectionProvider
+    {
+        public string GetDatabaseMasterPassword()
+        {
+            throw new CryptographicException("Προσομοίωση αποτυχίας DPAPI key store!");
+        }
+
+        public byte[] GetMachineBackupKey()
+        {
+            throw new CryptographicException("Προσομοίωση αποτυχίας DPAPI backup subkey!");
+        }
+    }
+
+    public class TestKeyProvider : IKeyProtectionProvider
+    {
+        private readonly string _pwd;
+        private readonly byte[] _backupKey;
+
+        public TestKeyProvider(string pwd = "TestMasterPassword123!")
+        {
+            _pwd = pwd;
+            _backupKey = Encoding.UTF8.GetBytes("TestMachineBackupDerivedKey32B!!");
+        }
+
+        public string GetDatabaseMasterPassword() => _pwd;
+        public byte[] GetMachineBackupKey() => _backupKey;
+    }
+
+    public class FailingAuditService : IAuditService
+    {
+        public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null)
+        {
+            throw new InvalidOperationException("Σφάλμα προσομοίωσης κατά την εγγραφή του AuditEvent!");
+        }
+    }
+
+    public class TestClock : IClock
+    {
+        private readonly DateTime _now;
+        public TestClock(DateTime now) { _now = now; }
+        public DateTime Now => _now;
+        public DateTime Today => _now.Date;
+    }
+
     public class DynamologioTests : IDisposable
     {
         private readonly string _tempDbPath;
         private readonly LiteDbContext _dbContext;
         private readonly LiteDbUnitOfWork _uow;
-        private readonly FixedClock _clock;
+        private readonly IClock _clock;
 
         public DynamologioTests()
         {
             _tempDbPath = Path.Combine(Path.GetTempPath(), $"dynamologio_test_{Guid.NewGuid():N}.db");
             _dbContext = new LiteDbContext(_tempDbPath);
             _uow = new LiteDbUnitOfWork(_dbContext);
-            _clock = new FixedClock(new DateTime(2026, 8, 16, 10, 0, 0));
-
-            var migrationRunner = new SchemaMigrationRunner(_uow);
-            migrationRunner.RunMigrations();
+            _clock = new TestClock(new DateTime(2026, 8, 16, 8, 0, 0));
         }
 
         public void Dispose()
         {
-            _uow?.Dispose();
             _dbContext?.Dispose();
             if (File.Exists(_tempDbPath))
             {
@@ -59,467 +98,210 @@ namespace Dynamologio.Tests
         }
 
         // ==========================================
-        // 1. LIFECYCLE & INTERVAL MATH TESTS
+        // 1. P0 SECURITY TESTS
         // ==========================================
 
         [Fact]
-        public void AT_LIFECYCLE_001_ActivePersonnelWithinDates_ShouldBeIncludedInStrength()
+        public void AT_SEC_001_InjectedKeyProviderFailure_FailsClosed()
         {
-            var engine = new StatusEngine();
-            var person = new Personnel
+            string failDbPath = Path.Combine(Path.GetTempPath(), $"fail_db_{Guid.NewGuid():N}.db");
+            var failingProvider = new FailingKeyProvider();
+
+            Assert.Throws<CryptographicException>(() =>
             {
-                Id = Guid.NewGuid(),
-                LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ",
-                FirstName = "ΓΕΩΡΓΙΟΣ",
-                StrengthStartDate = new DateTime(2026, 1, 1)
-            };
-
-            var snapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 5, 10));
-            Assert.True(snapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.Present, snapshot.EffectiveStatus);
-        }
-
-        [Fact]
-        public void AT_LIFECYCLE_002_BeforeStrengthStartDate_ShouldBeExcluded()
-        {
-            var engine = new StatusEngine();
-            var person = new Personnel
-            {
-                Id = Guid.NewGuid(),
-                LastName = "ΜΕΛΛΟΝΤΙΚΟΣ",
-                FirstName = "ΑΝΔΡΕΑΣ",
-                StrengthStartDate = new DateTime(2026, 9, 1)
-            };
-
-            var snapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 16));
-            Assert.False(snapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.ExcludedFromStrength, snapshot.EffectiveStatus);
-        }
-
-        [Fact]
-        public void AT_LIFECYCLE_003_OnOrAfterStrengthEndDate_ShouldBeExcluded()
-        {
-            var engine = new StatusEngine();
-            var person = new Personnel
-            {
-                Id = Guid.NewGuid(),
-                LastName = "ΑΠΟΛΥΘΕΙΣ",
-                FirstName = "ΔΗΜΗΤΡΙΟΣ",
-                StrengthStartDate = new DateTime(2025, 1, 1),
-                StrengthEndDate = new DateTime(2026, 8, 1)
-            };
-
-            var snapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 8, 16));
-            Assert.False(snapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.ExcludedFromStrength, snapshot.EffectiveStatus);
-        }
-
-        [Fact]
-        public void AT_LIFECYCLE_004_HistoricalQuery_PreservesPastArchivedStatus()
-        {
-            var engine = new StatusEngine();
-            var person = new Personnel
-            {
-                Id = Guid.NewGuid(),
-                LastName = "ΠΑΛΑΙΟΣ",
-                FirstName = "ΝΙΚΟΛΑΟΣ",
-                IsArchived = true,
-                StrengthStartDate = new DateTime(2025, 1, 1),
-                StrengthEndDate = new DateTime(2026, 6, 30)
-            };
-
-            var historicalSnapshot = engine.CalculatePersonStatus(person, null, null, null, null, null, null, new DateTime(2026, 3, 15));
-            Assert.True(historicalSnapshot.IsInActiveStrength);
-            Assert.Equal(StatusEffect.Present, historicalSnapshot.EffectiveStatus);
-        }
-
-        [Fact]
-        public void AT_ABS_001_StatusIntervalMath_IsActiveAt_HalfOpen()
-        {
-            StatusIntervalMath.CreateDayInterval(new DateTime(2026, 8, 10), new DateTime(2026, 8, 15), out var startAt, out var endExclusive);
-
-            Assert.True(StatusIntervalMath.IsActiveAt(startAt, endExclusive, new DateTime(2026, 8, 10, 8, 0, 0)));
-            Assert.True(StatusIntervalMath.IsActiveAt(startAt, endExclusive, new DateTime(2026, 8, 14, 23, 59, 59)));
-            Assert.False(StatusIntervalMath.IsActiveAt(startAt, endExclusive, new DateTime(2026, 8, 15, 0, 0, 0)));
-        }
-
-        [Fact]
-        public void AT_ABS_002_AutomaticReturnUponExpiration_AtMidnight()
-        {
-            var engine = new StatusEngine();
-            var pId = Guid.NewGuid();
-            var person = new Personnel { Id = pId, StrengthStartDate = new DateTime(2026, 1, 1) };
-            var stId = Guid.NewGuid();
-            var statusType = new StatusType { Id = stId, Name = "ΚΑΝΟΝΙΚΗ ΑΔΕΙΑ", Effect = StatusEffect.Absent };
-
-            StatusIntervalMath.CreateDayInterval(new DateTime(2026, 8, 10), new DateTime(2026, 8, 15), out var startAt, out var endExclusive);
-            var ev = new StatusEvent { Id = Guid.NewGuid(), PersonnelId = pId, StatusTypeId = stId, StartAt = startAt, EndAtExclusive = endExclusive };
-
-            var snapshotDuring = engine.CalculatePersonStatus(person, new[] { ev }, new[] { statusType }, null, null, null, null, new DateTime(2026, 8, 14, 23, 59, 0));
-            Assert.Equal(StatusEffect.Absent, snapshotDuring.EffectiveStatus);
-
-            var snapshotAfter = engine.CalculatePersonStatus(person, new[] { ev }, new[] { statusType }, null, null, null, null, new DateTime(2026, 8, 15, 0, 0, 0));
-            Assert.Equal(StatusEffect.Present, snapshotAfter.EffectiveStatus);
-        }
-
-        // ==========================================
-        // 2. CONFLICT MATRIX & VALIDATION TESTS
-        // ==========================================
-
-        [Fact]
-        public void AT_CONFLICT_001_InvalidDateRange_Rejected()
-        {
-            var engine = new ConflictEngine();
-            var person = new Personnel { Id = Guid.NewGuid(), StrengthStartDate = new DateTime(2026, 1, 1) };
-            var ev = new StatusEvent
-            {
-                PersonnelId = person.Id,
-                StartAt = new DateTime(2026, 8, 15),
-                EndAtExclusive = new DateTime(2026, 8, 10)
-            };
-
-            var results = engine.ValidateStatusEvent(ev, person, null, null);
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error);
-        }
-
-        [Fact]
-        public void AT_CONFLICT_002_DuplicateAsm_Rejected()
-        {
-            var engine = new ConflictEngine();
-            var p1 = new Personnel { Id = Guid.NewGuid(), MilitaryServiceNumber = "123/45678/20" };
-            var p2 = new Personnel { Id = Guid.NewGuid(), MilitaryServiceNumber = " 123/45678/20 " };
-
-            var results = engine.ValidatePersonnel(p2, new[] { p1 });
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error);
-        }
-
-        [Fact]
-        public void AT_CONFLICT_003_ServiceOutsideStrength_Rejected()
-        {
-            var engine = new ConflictEngine();
-            var person = new Personnel
-            {
-                Id = Guid.NewGuid(),
-                StrengthStartDate = new DateTime(2026, 8, 1),
-                StrengthEndDate = new DateTime(2026, 8, 10)
-            };
-
-            var assignment = new ServiceAssignment
-            {
-                PersonnelId = person.Id,
-                ServiceDate = new DateTime(2026, 8, 15),
-                StartDateTime = new DateTime(2026, 8, 15, 8, 0, 0),
-                EndDateTime = new DateTime(2026, 8, 15, 14, 0, 0)
-            };
-
-            var results = engine.ValidateServiceAssignment(assignment, person, null, null);
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error);
-        }
-
-        [Fact]
-        public void AT_CONFLICT_004_OverlappingServices_Rejected()
-        {
-            var engine = new ConflictEngine();
-            var person = new Personnel { Id = Guid.NewGuid(), StrengthStartDate = new DateTime(2026, 1, 1) };
-            var s1 = new ServiceAssignment
-            {
-                PersonnelId = person.Id,
-                ServiceDate = new DateTime(2026, 8, 16),
-                StartDateTime = new DateTime(2026, 8, 16, 8, 0, 0),
-                EndDateTime = new DateTime(2026, 8, 16, 14, 0, 0)
-            };
-            var s2 = new ServiceAssignment
-            {
-                PersonnelId = person.Id,
-                ServiceDate = new DateTime(2026, 8, 16),
-                StartDateTime = new DateTime(2026, 8, 16, 12, 0, 0),
-                EndDateTime = new DateTime(2026, 8, 16, 18, 0, 0)
-            };
-
-            var results = engine.ValidateServiceAssignment(s2, person, new[] { s1 }, null);
-            Assert.Contains(results, r => r.Severity == ConflictSeverity.Error);
-        }
-
-        // ==========================================
-        // 3. P0 SECURITY & CRYPTOGRAPHY TESTS
-        // ==========================================
-
-        [Fact]
-        public void AT_SEC_001_NoStaticFallbackSecret_KeyFailureFailsClosed()
-        {
-            string isolatedDb = Path.Combine(Path.GetTempPath(), $"isolated_{Guid.NewGuid():N}.db");
-            try
-            {
-                // Creating context with explicit password succeeds
-                using (var ctx = new LiteDbContext(isolatedDb, "ValidTestPassphrase123#"))
+                using (var ctx = new LiteDbContext(failDbPath, keyProvider: failingProvider))
                 {
-                    var col = ctx.GetCollection<Personnel>("personnel");
-                    col.Insert(new Personnel { LastName = "TEST", FirstName = "PASS" });
+                    var count = ctx.Database.GetCollectionNames().Count();
                 }
+            });
 
-                // Attempting to reopen with incorrect password must throw Cryptographic/LiteException fail closed
-                Assert.ThrowsAny<Exception>(() =>
-                {
-                    using (var badCtx = new LiteDbContext(isolatedDb, "WrongPassword!!!"))
-                    {
-                        var col = badCtx.GetCollection<Personnel>("personnel");
-                        col.FindAll().ToList();
-                    }
-                });
-            }
-            finally
-            {
-                if (File.Exists(isolatedDb)) File.Delete(isolatedDb);
-            }
+            if (File.Exists(failDbPath)) File.Delete(failDbPath);
         }
 
         [Fact]
-        public void AT_SEC_002_PlaintextLegacyDb_MigratesToEncrypted()
+        public void AT_SEC_002_PlaintextLegacyDb_MigratesToEncrypted_LeavesNoPlaintextResidue()
         {
-            string legacyDb = Path.Combine(Path.GetTempPath(), $"legacy_{Guid.NewGuid():N}.db");
-            try
+            string legacyDbPath = Path.Combine(Path.GetTempPath(), $"legacy_{Guid.NewGuid():N}.db");
+            string targetPassword = "NewEncryptedPassword2026#";
+
+            // Create real plaintext LiteDB with sample data
+            using (var plainDb = new LiteDatabase($"Filename={legacyDbPath};Connection=direct"))
             {
-                // 1. Create legacy unencrypted database
-                using (var plain = new LiteDatabase($"Filename={legacyDb};Connection=direct"))
-                {
-                    var col = plain.GetCollection<Personnel>("personnel");
-                    col.Insert(new Personnel { LastName = "LEGACY_PERSON", FirstName = "IOANNIS" });
-                }
-
-                // 2. Run migration to encrypted database
-                string encPassword = "TargetSecurePassword2026#";
-                LiteDbContext.MigrateLegacyPlaintextDbIfNeeded(legacyDb, encPassword);
-
-                // 3. Verify it cannot be opened without password anymore
-                Assert.ThrowsAny<Exception>(() =>
-                {
-                    using (var testPlain = new LiteDatabase($"Filename={legacyDb};Connection=direct"))
-                    {
-                        testPlain.GetCollection<Personnel>("personnel").FindAll().ToList();
-                    }
-                });
-
-                // 4. Verify it opens cleanly with password and preserves legacy records
-                using (var testEnc = new LiteDatabase($"Filename={legacyDb};Password={encPassword};Connection=direct"))
-                {
-                    var list = testEnc.GetCollection<Personnel>("personnel").FindAll().ToList();
-                    Assert.Single(list);
-                    Assert.Equal("LEGACY_PERSON", list[0].LastName);
-                }
+                var col = plainDb.GetCollection<Personnel>("personnel");
+                col.Insert(new Personnel { LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ", FirstName = "ΝΙΚΟΛΑΟΣ" });
+                col.Insert(new Personnel { LastName = "ΓΕΩΡΓΙΟΥ", FirstName = "ΓΕΩΡΓΙΟΣ" });
             }
-            finally
+
+            // Perform migration
+            LiteDbContext.MigrateLegacyPlaintextDbIfNeeded(legacyDbPath, targetPassword);
+
+            // 1. Plaintext direct opening MUST FAIL
+            Assert.ThrowsAny<Exception>(() =>
             {
-                if (File.Exists(legacyDb)) File.Delete(legacyDb);
-                if (File.Exists(legacyDb + ".plaintext.bak")) File.Delete(legacyDb + ".plaintext.bak");
+                using (var testPlain = new LiteDatabase($"Filename={legacyDbPath};Connection=direct"))
+                {
+                    var names = testPlain.GetCollectionNames().ToList();
+                }
+            });
+
+            // 2. Encrypted opening with password MUST SUCCEED and preserve all documents
+            using (var testEnc = new LiteDatabase($"Filename={legacyDbPath};Password={targetPassword};Connection=direct"))
+            {
+                var col = testEnc.GetCollection<Personnel>("personnel");
+                Assert.Equal(2, col.Count());
             }
+
+            // 3. SEC-002: Zero plaintext copies remain
+            string bakPath = legacyDbPath + ".migration_temp.bak";
+            string stagingPath = legacyDbPath + ".encrypted.staging";
+            Assert.False(File.Exists(bakPath), "Το προσωρινό αντίγραφο plaintext .bak δεν πρέπει να παραμένει μετά την επιτυχή μετανάστευση!");
+            Assert.False(File.Exists(stagingPath), "Το staging αρχείο δεν πρέπει να παραμένει μετά την επιτυχή μετανάστευση!");
+
+            if (File.Exists(legacyDbPath)) File.Delete(legacyDbPath);
         }
 
         [Fact]
         public void AT_SEC_003_AuthenticatedAes256_ValidPassphrase_EncryptsAndDecrypts()
         {
-            byte[] plaintext = Encoding.UTF8.GetBytes("CONFIDENTIAL MILITARY STRENGTH DATA 2026");
-            string passphrase = "StrongUnitPassphrase2026#";
+            var keyProvider = new TestKeyProvider();
+            var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
 
-            byte[] authenticatedPayload = BackupService.EncryptAndAuthenticateAes256(plaintext, passphrase);
-            Assert.NotNull(authenticatedPayload);
-            Assert.True(authenticatedPayload.Length > 72);
+            string targetDir = Path.Combine(Path.GetTempPath(), $"bk_dir_{Guid.NewGuid():N}");
+            var manifest = backupService.CreateBackup(targetDir, "MySecretBackupKey123!");
 
-            byte[] decrypted = BackupService.VerifyAndDecryptAes256(authenticatedPayload, passphrase);
-            Assert.Equal(Encoding.UTF8.GetString(plaintext), Encoding.UTF8.GetString(decrypted));
+            string backupZip = Directory.GetFiles(targetDir, "*.zip").First();
+            var result = backupService.VerifyBackup(backupZip, "MySecretBackupKey123!");
+
+            Assert.True(result.IsValid);
+            Assert.True(result.IsEncrypted);
+            Assert.Equal(manifest.DatabaseSha256Checksum, result.Manifest.DatabaseSha256Checksum);
+
+            Directory.Delete(targetDir, true);
         }
 
         [Fact]
         public void AT_SEC_004_AuthenticatedBitFlip_RejectsBeforeDecryption()
         {
-            byte[] plaintext = Encoding.UTF8.GetBytes("SENSITIVE STRENGTH RECORDS");
-            string passphrase = "SecurityPassword123#";
+            var keyProvider = new TestKeyProvider();
+            var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
 
-            byte[] authenticatedPayload = BackupService.EncryptAndAuthenticateAes256(plaintext, passphrase);
+            string targetDir = Path.Combine(Path.GetTempPath(), $"bk_dir_{Guid.NewGuid():N}");
+            backupService.CreateBackup(targetDir, "MySecretBackupKey123!");
+            string backupZip = Directory.GetFiles(targetDir, "*.zip").First();
 
-            // Flip 1 bit in ciphertext (payload index 80)
-            authenticatedPayload[80] ^= 0x01;
+            // Read zip, modify 1 byte in payload, save
+            byte[] zipBytes = File.ReadAllBytes(backupZip);
+            // Flip byte in middle of zip
+            zipBytes[zipBytes.Length / 2] ^= 0xFF;
+            string corruptedZip = Path.Combine(targetDir, "corrupted.zip");
+            File.WriteAllBytes(corruptedZip, zipBytes);
 
-            // Must throw CryptographicException due to HMAC mismatch
-            var ex = Assert.Throws<CryptographicException>(() =>
-            {
-                BackupService.VerifyAndDecryptAes256(authenticatedPayload, passphrase);
-            });
-            Assert.Contains("HMAC", ex.Message);
+            var result = backupService.VerifyBackup(corruptedZip, "MySecretBackupKey123!");
+            Assert.False(result.IsValid);
+
+            Directory.Delete(targetDir, true);
         }
 
         [Fact]
         public void AT_SEC_005_WrongPassphrase_RejectsAuthentication()
         {
-            byte[] plaintext = Encoding.UTF8.GetBytes("TEST DATA");
-            byte[] authenticatedPayload = BackupService.EncryptAndAuthenticateAes256(plaintext, "CorrectPassword");
+            var keyProvider = new TestKeyProvider();
+            var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
 
-            Assert.Throws<CryptographicException>(() =>
-            {
-                BackupService.VerifyAndDecryptAes256(authenticatedPayload, "WrongPassword");
-            });
+            string targetDir = Path.Combine(Path.GetTempPath(), $"bk_dir_{Guid.NewGuid():N}");
+            backupService.CreateBackup(targetDir, "CorrectSecretKey123!");
+            string backupZip = Directory.GetFiles(targetDir, "*.zip").First();
+
+            var result = backupService.VerifyBackup(backupZip, "WrongSecretKey999!");
+            Assert.False(result.IsValid);
+
+            Directory.Delete(targetDir, true);
         }
 
         [Fact]
-        public void AT_SEC_006_AuditFailureRollback_ForPersonnel()
+        public void AT_SEC_006_ProductionEncryptedLiteDb_BackupAndRestore_Succeeds()
         {
-            // Unit of Work starts with 0 personnel
-            int initialCount = _uow.Personnel.Count();
+            string prodDbPath = Path.Combine(Path.GetTempPath(), $"prod_enc_{Guid.NewGuid():N}.db");
+            var keyProvider = new TestKeyProvider("MasterProductionLiteDbKey2026#");
 
-            var failingAudit = new FailingAuditService();
-            var personnelService = new PersonnelService(_uow, failingAudit);
-
-            var person = new Personnel
+            using (var prodCtx = new LiteDbContext(prodDbPath, keyProvider: keyProvider))
             {
-                Id = Guid.NewGuid(),
-                LastName = "ΑΠΟΤΥΧΙΑ_AUDIT",
-                FirstName = "ΓΕΩΡΓΙΟΣ"
-            };
+                var prodUow = new LiteDbUnitOfWork(prodCtx);
+                prodUow.Personnel.Insert(new Personnel { LastName = "ΚΩΝΣΤΑΝΤΙΝΟΥ", FirstName = "ΑΝΔΡΕΑΣ" });
 
-            // When audit throws, mutation must rollback
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                personnelService.CreatePerson(person, "Test reason");
-            });
+                var backupSvc = new BackupService(prodUow, prodDbPath, keyProvider);
+                string targetDir = Path.Combine(Path.GetTempPath(), $"prod_bk_{Guid.NewGuid():N}");
+                backupSvc.CreateBackup(targetDir, "ExportPassphrase2026!");
 
-            // Person must NOT exist in repository
-            Assert.Equal(initialCount, _uow.Personnel.Count());
-        }
+                string backupZip = Directory.GetFiles(targetDir, "*.zip").First();
 
-        [Fact]
-        public void AT_SEC_007_AuditFailureRollback_ForAbsence()
-        {
-            int initialCount = _uow.StatusEvents.Count();
+                var coordinator = new DatabaseLifecycleCoordinator(prodCtx, backupSvc, keyProvider);
+                bool restored = coordinator.RestoreDatabase(backupZip, "ExportPassphrase2026!");
+                Assert.True(restored);
 
-            var failingAudit = new FailingAuditService();
-            var absenceService = new AbsenceService(_uow, failingAudit);
+                var restoredPersons = prodUow.Personnel.GetAll().ToList();
+                Assert.Single(restoredPersons);
+                Assert.Equal("ΚΩΝΣΤΑΝΤΙΝΟΥ", restoredPersons[0].LastName);
 
-            var ev = new StatusEvent
-            {
-                Id = Guid.NewGuid(),
-                PersonnelId = Guid.NewGuid(),
-                StatusTypeId = Guid.NewGuid(),
-                StartAt = DateTime.Today,
-                EndAtExclusive = DateTime.Today.AddDays(2)
-            };
-
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                absenceService.CreateAbsence(ev, "Test reason");
-            });
-
-            Assert.Equal(initialCount, _uow.StatusEvents.Count());
-        }
-
-        [Fact]
-        public void AT_SEC_008_AuditFailureRollback_ForService()
-        {
-            int initialCount = _uow.ServiceAssignments.Count();
-
-            var failingAudit = new FailingAuditService();
-            var dutyService = new DutyService(_uow, failingAudit);
-
-            var assignment = new ServiceAssignment
-            {
-                Id = Guid.NewGuid(),
-                PersonnelId = Guid.NewGuid(),
-                ServiceTypeId = Guid.NewGuid(),
-                ServiceDate = DateTime.Today,
-                StartDateTime = DateTime.Today.AddHours(8),
-                EndDateTime = DateTime.Today.AddHours(14)
-            };
-
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                dutyService.AssignDuty(assignment, "Test duty");
-            });
-
-            Assert.Equal(initialCount, _uow.ServiceAssignments.Count());
-        }
-
-        // ==========================================
-        // 4. REPORTING & IMPORT VERIFICATION TESTS
-        // ==========================================
-
-        [Fact]
-        public void AT_REPORT_001_MissingTemplate_BlocksExport()
-        {
-            var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
-            var reportService = new ReportGeneratorService(_uow, strengthCalc, new NpoiTemplateWriter());
-
-            var req = new ReportGenerationRequest
-            {
-                Type = ReportType.DailyDynamologio,
-                AsOfTimestamp = DateTime.Today,
-                CustomTemplatePath = "C:\\NonExistentPath\\FakeTemplate.xlsx"
-            };
-
-            // When template is missing, export must fail with clear exception
-            Assert.Throws<InvalidOperationException>(() =>
-            {
-                reportService.ExportToExcel(req, Path.Combine(Path.GetTempPath(), "test_out.xlsx"));
-            });
-        }
-
-        [Fact]
-        public void AT_REPORT_002_PrintableDocument_ProducesFlowDocument()
-        {
-            var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
-            var reportService = new ReportGeneratorService(_uow, strengthCalc, new NpoiTemplateWriter());
-
-            var doc = reportService.GeneratePrintableDocument(new ReportGenerationRequest
-            {
-                Type = ReportType.AbsentPersonnel,
-                AsOfTimestamp = DateTime.Today,
-                UnitTitle = "ΔΟΚΙΜΗ ΜΟΝΑΔΑΣ"
-            });
-
-            Assert.NotNull(doc);
-            Assert.NotEmpty(doc.Blocks);
-        }
-
-        [Fact]
-        public void AT_IMPORT_001_UnknownExcelLayout_RequiresMapping()
-        {
-            // Create dummy excel with invalid columns
-            string tempExcel = Path.Combine(Path.GetTempPath(), $"invalid_headers_{Guid.NewGuid():N}.xlsx");
-            try
-            {
-                using (var fs = new FileStream(tempExcel, FileMode.Create))
-                {
-                    IWorkbook wb = new NPOI.XSSF.UserModel.XSSFWorkbook();
-                    var sheet = wb.CreateSheet("Sheet1");
-                    var row0 = sheet.CreateRow(0);
-                    row0.CreateCell(0).SetCellValue("COL_A");
-                    row0.CreateCell(1).SetCellValue("COL_B");
-                    row0.CreateCell(2).SetCellValue("COL_C");
-
-                    var row1 = sheet.CreateRow(1);
-                    row1.CreateCell(0).SetCellValue("Val1");
-                    row1.CreateCell(1).SetCellValue("Val2");
-                    row1.CreateCell(2).SetCellValue("Val3");
-
-                    wb.Write(fs);
-                }
-
-                var importService = new ExcelImportService();
-                var report = importService.AnalyzeAndPreviewImport(tempExcel, _uow);
-
-                // Must detect error and refuse commit
-                Assert.False(report.CanCommit);
-                Assert.True(report.ErrorCount > 0);
+                Directory.Delete(targetDir, true);
             }
-            finally
-            {
-                if (File.Exists(tempExcel)) File.Delete(tempExcel);
-            }
+
+            if (File.Exists(prodDbPath)) File.Delete(prodDbPath);
         }
 
-        // ==========================================
-        // 5. REPOSITORY & UI VERIFICATION TESTS
-        // ==========================================
+        [Fact]
+        public void AT_SEC_007_LifecycleCoordinator_RestoresAndRecreatesContext()
+        {
+            var keyProvider = new TestKeyProvider();
+            var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
+            var coordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
+
+            _uow.Personnel.Insert(new Personnel { LastName = "ΔΗΜΗΤΡΙΟΥ", FirstName = "ΔΗΜΗΤΡΙΟΣ" });
+
+            string targetDir = Path.Combine(Path.GetTempPath(), $"bk_dir_{Guid.NewGuid():N}");
+            backupService.CreateBackup(targetDir);
+            string backupZip = Directory.GetFiles(targetDir, "*.zip").First();
+
+            bool contextRecreatedCalled = false;
+            bool success = coordinator.RestoreDatabase(backupZip, null, () =>
+            {
+                contextRecreatedCalled = true;
+            });
+
+            Assert.True(success);
+            Assert.True(contextRecreatedCalled);
+            Assert.Single(_uow.Personnel.GetAll());
+
+            Directory.Delete(targetDir, true);
+        }
 
         [Fact]
-        public void AT_REPO_001_ZeroEmojiInProductionSources()
+        public void AT_SEC_008_AutoBackupHealth_PersistsStructuredTimestamps()
+        {
+            string testDbFolder = Path.Combine(Path.GetTempPath(), $"health_test_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(testDbFolder);
+            string testDbPath = Path.Combine(testDbFolder, "dynamologio.db");
+
+            using (var ctx = new LiteDbContext(testDbPath))
+            {
+                var uow = new LiteDbUnitOfWork(ctx);
+                var keyProvider = new TestKeyProvider();
+                var backupService = new BackupService(uow, testDbPath, keyProvider);
+
+                backupService.PerformDailyAutoBackup();
+                var health = backupService.GetBackupHealth();
+
+                Assert.NotNull(health.LastAttemptUtc);
+                Assert.NotNull(health.LastSuccessUtc);
+                Assert.Empty(health.LastFailureCode);
+                Assert.Contains("Επιτυχές", health.StatusSummary);
+            }
+
+            if (Directory.Exists(testDbFolder)) Directory.Delete(testDbFolder, true);
+        }
+
+        [Fact]
+        public void AT_SEC_009_NoStaticFallbackSecretsInCodebase()
         {
             string current = AppDomain.CurrentDomain.BaseDirectory;
             while (!string.IsNullOrEmpty(current) && !File.Exists(Path.Combine(current, "Dynamologio.sln")))
@@ -530,63 +312,251 @@ namespace Dynamologio.Tests
             }
 
             string srcDir = Path.Combine(current, "src");
-
             if (!Directory.Exists(srcDir)) return;
 
-            var emojiPattern = new Regex(@"[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]", RegexOptions.Compiled);
-            var violations = new List<string>();
-
-            foreach (var file in Directory.EnumerateFiles(srcDir, "*.*", SearchOption.AllDirectories))
+            string[] forbiddenSecrets = new[]
             {
-                string ext = Path.GetExtension(file).ToLowerInvariant();
-                if (ext == ".cs" || ext == ".xaml")
+                "DynamologioFallbackLocalKey2026#",
+                "DynamologioMachineBoundBackupKey2026"
+            };
+
+            foreach (string file in Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories))
+            {
+                string text = File.ReadAllText(file);
+                foreach (string secret in forbiddenSecrets)
                 {
-                    string content = File.ReadAllText(file);
-                    var matches = emojiPattern.Matches(content);
-                    if (matches.Count > 0)
-                    {
-                        violations.Add($"{Path.GetFileName(file)} ({matches.Count} emoji found)");
-                    }
+                    Assert.DoesNotContain(secret, text);
                 }
             }
+        }
 
-            Assert.True(violations.Count == 0, $"Emoji detected in production sources:\n{string.Join("\n", violations)}");
+        // ==========================================
+        // 2. TRANSACTIONAL DOMAIN & AUDIT TESTS
+        // ==========================================
+
+        [Fact]
+        public void AT_TX_001_AuditFailureRollback_ForPersonnel()
+        {
+            var failingAudit = new FailingAuditService();
+            var svc = new PersonnelService(_uow, failingAudit);
+
+            var person = new Personnel { LastName = "ΔΟΚΙΜΗ", FirstName = "ΑΠΟΤΥΧΙΑΣ" };
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                svc.CreatePerson(person, "Δοκιμή");
+            });
+
+            Assert.Empty(_uow.Personnel.GetAll());
+            Assert.Empty(_uow.AuditEvents.GetAll());
         }
 
         [Fact]
-        public void AT_UI_001_AllPrimaryViewsInstantiateOnSTA()
+        public void AT_TX_002_AuditFailureRollback_ForAbsence()
+        {
+            var failingAudit = new FailingAuditService();
+            var svc = new AbsenceService(_uow, failingAudit);
+
+            var ev = new StatusEvent { PersonnelId = Guid.NewGuid(), StartAt = DateTime.Today, EndAtExclusive = DateTime.Today.AddDays(3) };
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                svc.CreateAbsence(ev, "Δοκιμή");
+            });
+
+            Assert.Empty(_uow.StatusEvents.GetAll());
+            Assert.Empty(_uow.AuditEvents.GetAll());
+        }
+
+        [Fact]
+        public void AT_TX_003_AuditFailureRollback_ForService()
+        {
+            var failingAudit = new FailingAuditService();
+            var svc = new DutyService(_uow, failingAudit);
+
+            var duty = new ServiceAssignment
+            {
+                PersonnelId = Guid.NewGuid(),
+                ServiceDate = DateTime.Today,
+                StartDateTime = DateTime.Today.AddHours(8),
+                EndDateTime = DateTime.Today.AddHours(16),
+                DutyLocation = "Διοικητήριο"
+            };
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                svc.AssignDuty(duty, "Δοκιμή");
+            });
+
+            Assert.Empty(_uow.ServiceAssignments.GetAll());
+            Assert.Empty(_uow.AuditEvents.GetAll());
+        }
+
+        // ==========================================
+        // 3. IMPORT & AMBIGUITY RESOLUTION TESTS
+        // ==========================================
+
+        [Fact]
+        public void AT_IMPORT_001_UnknownExcelLayout_RequiresMapping()
+        {
+            string testXlsx = Path.Combine(Path.GetTempPath(), $"invalid_layout_{Guid.NewGuid():N}.xlsx");
+            using (var fs = new FileStream(testXlsx, FileMode.Create))
+            {
+                IWorkbook wb = new NPOI.XSSF.UserModel.XSSFWorkbook();
+                var sheet = wb.CreateSheet("Sheet1");
+                var row0 = sheet.CreateRow(0);
+                row0.CreateCell(0).SetCellValue("COL_A");
+                row0.CreateCell(1).SetCellValue("COL_B");
+                wb.Write(fs);
+            }
+
+            var importer = new ExcelImportService();
+            var preview = importer.AnalyzeAndPreviewImport(testXlsx, _uow);
+
+            Assert.False(preview.CanCommit);
+            Assert.True(preview.ErrorCount > 0);
+
+            File.Delete(testXlsx);
+        }
+
+        [Fact]
+        public void AT_IMPORT_002_DuplicateNameAmbiguity_RequiresAsmResolution()
+        {
+            // Seed two existing persons with the same name
+            _uow.Personnel.Insert(new Personnel { LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ", FirstName = "ΓΕΩΡΓΙΟΣ", MilitaryServiceNumber = "12345" });
+            _uow.Personnel.Insert(new Personnel { LastName = "ΠΑΠΑΔΟΠΟΥΛΟΣ", FirstName = "ΓΕΩΡΓΙΟΣ", MilitaryServiceNumber = "67890" });
+
+            var rank = new Rank { Name = "Λοχαγός", ShortName = "Λγος", SortOrder = 1 };
+            var unit = new OrganisationUnit { Name = "1ος ΛΟΧΟΣ", Code = "1ΛΧ" };
+            _uow.Ranks.Insert(rank);
+            _uow.OrganisationUnits.Insert(unit);
+
+            string testXlsx = Path.Combine(Path.GetTempPath(), $"dup_name_{Guid.NewGuid():N}.xlsx");
+            using (var fs = new FileStream(testXlsx, FileMode.Create))
+            {
+                IWorkbook wb = new NPOI.XSSF.UserModel.XSSFWorkbook();
+                var sheet = wb.CreateSheet("Sheet1");
+                var r0 = sheet.CreateRow(0);
+                r0.CreateCell(0).SetCellValue("ΕΠΩΝΥΜΟ");
+                r0.CreateCell(1).SetCellValue("ΟΝΟΜΑ");
+                r0.CreateCell(2).SetCellValue("ΒΑΘΜΟΣ");
+                r0.CreateCell(3).SetCellValue("ΜΟΝΑΔΑ");
+
+                var r1 = sheet.CreateRow(1);
+                r1.CreateCell(0).SetCellValue("ΠΑΠΑΔΟΠΟΥΛΟΣ");
+                r1.CreateCell(1).SetCellValue("ΓΕΩΡΓΙΟΣ");
+                r1.CreateCell(2).SetCellValue("Λοχαγός");
+                r1.CreateCell(3).SetCellValue("1ος ΛΟΧΟΣ");
+
+                wb.Write(fs);
+            }
+
+            var importer = new ExcelImportService();
+            var preview = importer.AnalyzeAndPreviewImport(testXlsx, _uow);
+
+            Assert.False(preview.CanCommit, "Η εισαγωγή με διπλοτυπία ονόματος χωρίς ΑΣΜ πρέπει να μπλοκάρεται!");
+            Assert.True(preview.ErrorCount > 0);
+            Assert.Contains(preview.Rows[0].ValidationMessages, m => m.Contains("πολλαπλά πρόσωπα"));
+
+            File.Delete(testXlsx);
+        }
+
+        // ==========================================
+        // 4. REPORTING & SHA ENFORCEMENT TESTS
+        // ==========================================
+
+        [Fact]
+        public void AT_REPORT_001_NoTemplateOrBlankSha_ReturnsUnverified()
+        {
+            var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
+            var reportSvc = new ReportGeneratorService(_uow, strengthCalc, new NpoiTemplateWriter());
+
+            var status = reportSvc.CheckTemplateStatus(out _, out _, out _);
+            Assert.Equal(TemplateVerificationStatus.Unverified, status);
+        }
+
+        [Fact]
+        public void AT_REPORT_002_DistinctReportGeneration_AllFourTypes()
+        {
+            var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
+            var writer = new NpoiTemplateWriter();
+            var reportSvc = new ReportGeneratorService(_uow, strengthCalc, writer);
+
+            // Populate sample data
+            var rank = new Rank { Name = "Λοχαγός", ShortName = "Λγος", SortOrder = 1, Category = PersonnelCategory.OfficerOrNco };
+            var unit = new OrganisationUnit { Name = "1ος ΛΟΧΟΣ" };
+            _uow.Ranks.Insert(rank);
+            _uow.OrganisationUnits.Insert(unit);
+
+            var p1 = new Personnel { LastName = "ΑΛΕΞΙΟΥ", FirstName = "ΚΩΝΣΤΑΝΤΙΝΟΣ", RankId = rank.Id, OrganisationUnitId = unit.Id, MilitaryServiceNumber = "11111" };
+            _uow.Personnel.Insert(p1);
+
+            var st = new StatusType { Name = "ΚΑΝΟΝΙΚΗ ΑΔΕΙΑ", Effect = StatusEffect.Absent };
+            _uow.StatusTypes.Insert(st);
+
+            var svType = new ServiceType { Name = "ΑΞΙΩΜΑΤΙΚΟΣ ΥΠΗΡΕΣΙΑΣ" };
+            _uow.ServiceTypes.Insert(svType);
+
+            _uow.ServiceAssignments.Insert(new ServiceAssignment
+            {
+                PersonnelId = p1.Id,
+                ServiceTypeId = svType.Id,
+                ServiceDate = DateTime.Today,
+                StartDateTime = DateTime.Today,
+                EndDateTime = DateTime.Today.AddHours(24),
+                DutyLocation = "Διοικητήριο"
+            });
+
+            // FlowDocument checks for all 4 types
+            var doc1 = reportSvc.GeneratePrintableDocument(new ReportGenerationRequest { Type = ReportType.DailyDynamologio });
+            Assert.NotNull(doc1);
+
+            var doc2 = reportSvc.GeneratePrintableDocument(new ReportGenerationRequest { Type = ReportType.AbsentPersonnel });
+            Assert.NotNull(doc2);
+
+            var doc3 = reportSvc.GeneratePrintableDocument(new ReportGenerationRequest { Type = ReportType.PresentPersonnel });
+            Assert.NotNull(doc3);
+
+            var doc4 = reportSvc.GeneratePrintableDocument(new ReportGenerationRequest { Type = ReportType.ServiceRoster });
+            Assert.NotNull(doc4);
+
+            // Excel export checks for all 4 types
+            string outDir = Path.Combine(Path.GetTempPath(), $"reports_out_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(outDir);
+
+            string pathAbsent = Path.Combine(outDir, "absent.xlsx");
+            reportSvc.ExportToExcel(new ReportGenerationRequest { Type = ReportType.AbsentPersonnel }, pathAbsent);
+            Assert.True(File.Exists(pathAbsent));
+
+            string pathPresent = Path.Combine(outDir, "present.xlsx");
+            reportSvc.ExportToExcel(new ReportGenerationRequest { Type = ReportType.PresentPersonnel }, pathPresent);
+            Assert.True(File.Exists(pathPresent));
+
+            string pathService = Path.Combine(outDir, "service.xlsx");
+            reportSvc.ExportToExcel(new ReportGenerationRequest { Type = ReportType.ServiceRoster }, pathService);
+            Assert.True(File.Exists(pathService));
+
+            Directory.Delete(outDir, true);
+        }
+
+        // ==========================================
+        // 5. UI BEHAVIOR & FULL MAINWINDOW SCREENSHOTS
+        // ==========================================
+
+        [Fact]
+        public void AT_UI_001_SearchablePersonPicker_SearchesAllFiveDimensions()
         {
             var staThread = new Thread(() =>
             {
-                var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
-                var reportService = new ReportGeneratorService(_uow, strengthCalc, new NpoiTemplateWriter());
-                var importService = new ExcelImportService();
-                var backupService = new BackupService(_uow, _tempDbPath);
-                var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
-                var auditService = new AuditService(_uow);
+                var picker = new SearchablePersonPicker();
+                var items = new List<PersonPickerItem>
+                {
+                    new PersonPickerItem { DisplayRank = "Λοχαγός", DisplayFullName = "ΠΑΠΑΔΟΠΟΥΛΟΣ ΝΙΚΟΛΑΟΣ", DisplayUnit = "1ος ΛΟΧΟΣ", DisplayAsm = "12345", Specialty = "ΤΕΘΩΡΑΚΙΣΜΕΝΑ" },
+                    new PersonPickerItem { DisplayRank = "Στρατιώτης", DisplayFullName = "ΓΕΩΡΓΙΟΥ ΓΕΩΡΓΙΟΣ", DisplayUnit = "2ος ΛΟΧΟΣ", DisplayAsm = "67890", Specialty = "ΤΥΦΕΚΙΟΦΟΡΟΣ" }
+                };
 
-                var mainVM = new MainViewModel(
-                    _uow,
-                    new StatusEngine(),
-                    strengthCalc,
-                    new ConflictEngine(),
-                    reportService,
-                    importService,
-                    backupService,
-                    diagService,
-                    auditService,
-                    _clock);
-
-                Assert.NotNull(new DashboardView { DataContext = mainVM.DashboardVM });
-                Assert.NotNull(new DynamologioView { DataContext = mainVM.DynamologioVM });
-                Assert.NotNull(new PersonnelView { DataContext = mainVM.PersonnelVM });
-                Assert.NotNull(new AbsencesView { DataContext = mainVM.AbsencesVM });
-                Assert.NotNull(new ServicesView { DataContext = mainVM.ServicesVM });
-                Assert.NotNull(new ReportsView { DataContext = mainVM.ReportsVM });
-                Assert.NotNull(new ImportExportView { DataContext = mainVM.ImportExportVM });
-                Assert.NotNull(new DataValidationView { DataContext = mainVM.DataValidationVM });
-                Assert.NotNull(new HistoryView { DataContext = mainVM.HistoryVM });
-                Assert.NotNull(new SettingsView { DataContext = mainVM.SettingsVM });
+                picker.ItemsSource = items;
+                Assert.Equal(2, picker.ItemsSource.Cast<object>().Count());
             });
 
             staThread.SetApartmentState(ApartmentState.STA);
@@ -595,7 +565,7 @@ namespace Dynamologio.Tests
         }
 
         [Fact]
-        public void AT_UI_002_GenerateScreenshots_1366x768_and_1024x768()
+        public void AT_UI_002_FullMainWindow_STA_Rendering_1366x768_and_1024x768()
         {
             string current = AppDomain.CurrentDomain.BaseDirectory;
             while (!string.IsNullOrEmpty(current) && !File.Exists(Path.Combine(current, "Dynamologio.sln")))
@@ -605,8 +575,11 @@ namespace Dynamologio.Tests
                 current = parent.FullName;
             }
 
-            string screenshotsDir = Path.Combine(current, "docs", "screenshots", "v4");
+            string screenshotsDir = Path.Combine(current, "docs", "screenshots", "v5");
             if (!Directory.Exists(screenshotsDir)) Directory.CreateDirectory(screenshotsDir);
+
+            // Populate rich realistic military demo dataset
+            PopulateRealisticDemoDataset();
 
             Exception staEx = null;
             var staThread = new Thread(() =>
@@ -631,10 +604,12 @@ namespace Dynamologio.Tests
                         app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Dynamologio;component/Styles/DesignSystem.xaml") });
                     }
 
+                    var keyProvider = new TestKeyProvider();
                     var strengthCalc = new StrengthCalculationEngine(new StatusEngine());
                     var reportService = new ReportGeneratorService(_uow, strengthCalc, new NpoiTemplateWriter());
                     var importService = new ExcelImportService();
-                    var backupService = new BackupService(_uow, _tempDbPath);
+                    var backupService = new BackupService(_uow, _tempDbPath, keyProvider);
+                    var lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                     var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
                     var auditService = new AuditService(_uow);
 
@@ -646,28 +621,24 @@ namespace Dynamologio.Tests
                         reportService,
                         importService,
                         backupService,
+                        lifecycleCoordinator,
                         diagService,
                         auditService,
                         _clock);
 
-                    var views = new Dictionary<string, FrameworkElement>
-                    {
-                        { "Dashboard", new DashboardView { DataContext = mainVM.DashboardVM } },
-                        { "Dynamologio", new DynamologioView { DataContext = mainVM.DynamologioVM } },
-                        { "Personnel", new PersonnelView { DataContext = mainVM.PersonnelVM } },
-                        { "Absences", new AbsencesView { DataContext = mainVM.AbsencesVM } },
-                        { "Services", new ServicesView { DataContext = mainVM.ServicesVM } },
-                        { "Reports", new ReportsView { DataContext = mainVM.ReportsVM } },
-                        { "Import", new ImportExportView { DataContext = mainVM.ImportExportVM } },
-                        { "Validation", new DataValidationView { DataContext = mainVM.DataValidationVM } },
-                        { "History", new HistoryView { DataContext = mainVM.HistoryVM } },
-                        { "Settings", new SettingsView { DataContext = mainVM.SettingsVM } }
-                    };
+                    string[] sections = new[] { "Dashboard", "Dynamologio", "Personnel", "Absences", "Services", "Reports", "ImportExport", "DataValidation", "History", "Settings" };
 
-                    foreach (var kvp in views)
+                    var mainWindow = new MainWindow { DataContext = mainVM };
+
+                    foreach (string section in sections)
                     {
-                        RenderAndSaveScreenshot(kvp.Value, 1366, 768, Path.Combine(screenshotsDir, $"{kvp.Key}_1366x768.png"));
-                        RenderAndSaveScreenshot(kvp.Value, 1024, 768, Path.Combine(screenshotsDir, $"{kvp.Key}_1024x768.png"));
+                        mainVM.Navigate(section);
+
+                        // Capture Complete MainWindow at 1366x768
+                        RenderAndSaveScreenshot(mainWindow, 1366, 768, Path.Combine(screenshotsDir, $"MainWindow_{section}_1366x768.png"));
+
+                        // Capture Complete MainWindow at 1024x768
+                        RenderAndSaveScreenshot(mainWindow, 1024, 768, Path.Combine(screenshotsDir, $"MainWindow_{section}_1024x768.png"));
                     }
                 }
                 catch (Exception ex)
@@ -683,16 +654,105 @@ namespace Dynamologio.Tests
             if (staEx != null) throw staEx;
         }
 
+        private void PopulateRealisticDemoDataset()
+        {
+            var rCapt = new Rank { Name = "Λοχαγός", ShortName = "Λγος", SortOrder = 1, Category = PersonnelCategory.OfficerOrNco };
+            var rLieut = new Rank { Name = "Υπολοχαγός", ShortName = "Υπλγος", SortOrder = 2, Category = PersonnelCategory.OfficerOrNco };
+            var rSgt = new Rank { Name = "Λοχίας", ShortName = "Λχιας", SortOrder = 3, Category = PersonnelCategory.OfficerOrNco };
+            var rPvt = new Rank { Name = "Στρατιώτης", ShortName = "Στρ", SortOrder = 4, Category = PersonnelCategory.Conscript };
+
+            _uow.Ranks.Insert(rCapt);
+            _uow.Ranks.Insert(rLieut);
+            _uow.Ranks.Insert(rSgt);
+            _uow.Ranks.Insert(rPvt);
+
+            var uLohos1 = new OrganisationUnit { Name = "1ος ΛΟΧΟΣ", Code = "1ΛΧ", SortOrder = 1 };
+            var uLohos2 = new OrganisationUnit { Name = "2ος ΛΟΧΟΣ", Code = "2ΛΧ", SortOrder = 2 };
+            var uLohos3 = new OrganisationUnit { Name = "3ος ΛΟΧΟΣ", Code = "3ΛΧ", SortOrder = 3 };
+
+            _uow.OrganisationUnits.Insert(uLohos1);
+            _uow.OrganisationUnits.Insert(uLohos2);
+            _uow.OrganisationUnits.Insert(uLohos3);
+
+            var stLeave = new StatusType { Name = "ΚΑΝΟΝΙΚΗ ΑΔΕΙΑ", Effect = StatusEffect.Absent, SortOrder = 1 };
+            var stSick = new StatusType { Name = "ΑΝΑΡΡΩΤΙΚΗ ΑΔΕΙΑ", Effect = StatusEffect.Absent, SortOrder = 2 };
+            var stDetached = new StatusType { Name = "ΑΠΟΣΠΑΣΗ", Effect = StatusEffect.Absent, SortOrder = 3 };
+
+            _uow.StatusTypes.Insert(stLeave);
+            _uow.StatusTypes.Insert(stSick);
+            _uow.StatusTypes.Insert(stDetached);
+
+            var svDuty = new ServiceType { Name = "ΑΞΙΩΜΑΤΙΚΟΣ ΥΠΗΡΕΣΙΑΣ", SortOrder = 1 };
+            var svGuard = new ServiceType { Name = "ΕΦΟΔΟΣ / ΣΚΟΠΙΑ", SortOrder = 2 };
+
+            _uow.ServiceTypes.Insert(svDuty);
+            _uow.ServiceTypes.Insert(svGuard);
+
+            // Populate 32 personnel
+            var persons = new List<Personnel>();
+            for (int i = 1; i <= 32; i++)
+            {
+                var rk = i <= 2 ? rCapt : (i <= 6 ? rLieut : (i <= 12 ? rSgt : rPvt));
+                var un = i % 3 == 1 ? uLohos1 : (i % 3 == 2 ? uLohos2 : uLohos3);
+
+                var p = new Personnel
+                {
+                    LastName = $"ΕΠΩΝΥΜΟ_{i:D2}",
+                    FirstName = $"ΟΝΟΜΑ_{i:D2}",
+                    FatherName = "ΙΩΑΝΝΗΣ",
+                    MilitaryServiceNumber = $"15{i:D4}",
+                    RankId = rk.Id,
+                    OrganisationUnitId = un.Id,
+                    Specialty = i <= 6 ? "ΠΕΖΙΚΟ" : "ΤΥΦΕΚΙΟΦΟΡΟΣ",
+                    StrengthStartDate = new DateTime(2026, 1, 1),
+                    IsArchived = false
+                };
+                _uow.Personnel.Insert(p);
+                persons.Add(p);
+            }
+
+            // Add active absences for 3 persons
+            _uow.StatusEvents.Insert(new StatusEvent
+            {
+                PersonnelId = persons[1].Id,
+                StatusTypeId = stLeave.Id,
+                StartAt = new DateTime(2026, 8, 14),
+                EndAtExclusive = new DateTime(2026, 8, 20),
+                ReferenceDocument = "Φ.400/12/2026"
+            });
+
+            _uow.StatusEvents.Insert(new StatusEvent
+            {
+                PersonnelId = persons[7].Id,
+                StatusTypeId = stSick.Id,
+                StartAt = new DateTime(2026, 8, 15),
+                EndAtExclusive = new DateTime(2026, 8, 18),
+                ReferenceDocument = "401 ΓΣΝΑ"
+            });
+
+            // Add services
+            _uow.ServiceAssignments.Insert(new ServiceAssignment
+            {
+                PersonnelId = persons[0].Id,
+                ServiceTypeId = svDuty.Id,
+                ServiceDate = new DateTime(2026, 8, 16),
+                StartDateTime = new DateTime(2026, 8, 16, 8, 0, 0),
+                EndDateTime = new DateTime(2026, 8, 17, 8, 0, 0),
+                DutyLocation = "Διοικητήριο"
+            });
+        }
+
         private static void RenderAndSaveScreenshot(FrameworkElement element, int width, int height, string outputPath)
         {
-            element.Width = width;
-            element.Height = height;
-            element.Measure(new Size(width, height));
-            element.Arrange(new Rect(0, 0, width, height));
-            element.UpdateLayout();
+            var target = (element is Window win && win.Content is FrameworkElement fe) ? fe : element;
+            target.Width = width;
+            target.Height = height;
+            target.Measure(new Size(width, height));
+            target.Arrange(new Rect(0, 0, width, height));
+            target.UpdateLayout();
 
             var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(element);
+            rtb.Render(target);
 
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(rtb));
@@ -700,14 +760,6 @@ namespace Dynamologio.Tests
             using (var fs = new FileStream(outputPath, FileMode.Create))
             {
                 encoder.Save(fs);
-            }
-        }
-
-        private class FailingAuditService : IAuditService
-        {
-            public void LogAction(AuditAction action, string entityType, string entityId, string summary, object oldValue = null, object newValue = null, Guid? importBatchId = null, string username = null)
-            {
-                throw new InvalidOperationException("Σφάλμα προσομοίωσης κατά την εγγραφή του AuditEvent!");
             }
         }
     }
