@@ -3,7 +3,8 @@ using System;
 namespace Dynamologio.App.Navigation
 {
     /// <summary>
-    /// Owns the current ViewModel lifecycle: creates VMs via factory, activates them, tracks the active section.
+    /// Holds the active navigation state and coordinates section transitions.
+    /// Does NOT own ViewModel creation or lifecycle (MainViewModel handles activation).
     /// </summary>
     public class NavigationService : INavigationService
     {

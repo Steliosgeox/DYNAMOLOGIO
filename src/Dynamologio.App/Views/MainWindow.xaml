@@ -141,108 +141,28 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,8,0,8">
                         
-                        <!-- Dashboard -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Dashboard, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Dashboard">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconHomeGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Αρχική" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Dynamologio -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Dynamologio, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Dynamologio">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconStrengthGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Δυναμολόγιο" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Personnel -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Personnel, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Personnel">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPersonnelGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Προσωπικό" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Absences -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Absences, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Absences">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconAbsenceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Απουσίες" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Services -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Services, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Services">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconServiceGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Υπηρεσίες" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Reports -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Reports, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Reports">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPrintGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Αναφορές" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Separator Line -->
-                        <Border Height="1" Background="#1F2937" Margin="12,6,12,6" />
-
-                        <!-- Import -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=ImportExport, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="ImportExport">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconImportGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Εισαγωγή" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Validation -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=DataValidation, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="DataValidation">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconValidationGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Έλεγχος" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- History -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=History, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="History">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconHistoryGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Ιστορικό" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <!-- Settings -->
-                        <RadioButton Style="{StaticResource SidebarNavItemStyle}"
-                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqToBoolConverter}, ConverterParameter=Settings, Mode=OneWay}"
-                                     Command="{Binding NavigateCommand}" CommandParameter="Settings">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconSettingsGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,10,0" />
-                                <TextBlock Text="Ρυθμίσεις" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
+                        <ItemsControl ItemsSource="{Binding NavigationItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <RadioButton Style="{StaticResource SidebarNavItemStyle}"
+                                                 IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                 Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" 
+                                                 CommandParameter="{Binding}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Icon}" 
+                                                       FontFamily="Segoe MDL2 Assets" 
+                                                       FontSize="15" 
+                                                       Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" 
+                                                       Margin="0,0,10,0" 
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Label}" 
+                                                       Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" 
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                     </StackPanel>
                 </ScrollViewer>

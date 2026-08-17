@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using Dynamologio.App.Navigation;
@@ -45,6 +46,8 @@ namespace Dynamologio.App.ViewModels
             set => SetProperty(ref _officeNameHeader, value);
         }
 
+        public ObservableCollection<NavigationItemViewModel> NavigationItems { get; } = new ObservableCollection<NavigationItemViewModel>();
+
         public ICommand NavigateCommand { get; }
 
         public MainViewModel(
@@ -70,11 +73,13 @@ namespace Dynamologio.App.ViewModels
                 {
                     _navigationService.Navigate(section);
                 }
-                else if (param is string sectionName && Enum.TryParse(sectionName, out NavigationSection parsed))
+                else if (param is NavigationItemViewModel item)
                 {
-                    _navigationService.Navigate(parsed);
+                    _navigationService.Navigate(item.Section);
                 }
             });
+
+            InitializeNavigationItems();
 
             // Load deployment settings from database
             if (uow != null)
@@ -101,6 +106,11 @@ namespace Dynamologio.App.ViewModels
         private void OnNavigated(NavigationSection section)
         {
             ActiveSection = section;
+            foreach (var item in NavigationItems)
+            {
+                item.IsSelected = item.Section == section;
+            }
+
             var vm = _viewModelFactory.Create(section);
 
             if (vm is IActivatableViewModel activatable)
@@ -121,6 +131,20 @@ namespace Dynamologio.App.ViewModels
         {
             // Re-navigate to the current section to reload data
             _navigationService.Navigate(ActiveSection);
+        }
+
+        private void InitializeNavigationItems()
+        {
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Dashboard, Label = "Αρχική", Icon = "\uE80F" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Dynamologio, Label = "Δυναμολόγιο", Icon = "\uE811" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Personnel, Label = "Προσωπικό", Icon = "\uE716" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Absences, Label = "Απουσίες", Icon = "\uE72B" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Services, Label = "Υπηρεσίες", Icon = "\uE713" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Reports, Label = "Αναφορές", Icon = "\uE71D" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.ImportExport, Label = "Εισαγωγή / Εξαγωγή", Icon = "\uE753" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.DataValidation, Label = "Έλεγχος Δεδομένων", Icon = "\uE734" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.History, Label = "Ιστορικό", Icon = "\uE81C" });
+            NavigationItems.Add(new NavigationItemViewModel { Section = NavigationSection.Settings, Label = "Ρυθμίσεις", Icon = "\uE713" });
         }
     }
 }
