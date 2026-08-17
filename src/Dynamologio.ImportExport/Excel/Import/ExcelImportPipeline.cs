@@ -7,6 +7,7 @@ using System.Text;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
+using Newtonsoft.Json;
 using NPOI.HSSF.UserModel;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
@@ -43,6 +44,7 @@ namespace Dynamologio.ImportExport.Excel.Import
         public string UnitName { get; set; } = string.Empty;
         public string Specialty { get; set; } = string.Empty;
         public string CategoryName { get; set; } = string.Empty;
+        public DateTime? EffectiveStartDate { get; set; }
         public List<string> ValidationMessages { get; set; } = new List<string>();
         public List<FieldDiff> FieldDiffs { get; set; } = new List<FieldDiff>();
 
@@ -87,13 +89,13 @@ namespace Dynamologio.ImportExport.Excel.Import
 
     public interface IExcelImportService
     {
-        ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow, Dictionary<string, int> customColumnMapping = null);
-        ImportBatch CommitImport(ImportPreviewReport previewReport, IUnitOfWork uow, string operatorUsername = "OPERATOR");
+        ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow, Dictionary<string, int> customColumnMapping = null, DateTime? defaultEffectiveDate = null);
+        ImportBatch CommitImport(ImportPreviewReport previewReport, IUnitOfWork uow, string operatorUsername = null, DateTime? explicitEffectiveDate = null);
     }
 
     public class ExcelImportService : IExcelImportService
     {
-        public ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow, Dictionary<string, int> customColumnMapping = null)
+        public ImportPreviewReport AnalyzeAndPreviewImport(string filePath, IUnitOfWork uow, Dictionary<string, int> customColumnMapping = null, DateTime? defaultEffectiveDate = null)
         {
             if (!File.Exists(filePath))
             {
@@ -152,6 +154,8 @@ namespace Dynamologio.ImportExport.Excel.Import
                                 colMap["UNIT"] = c;
                             else if (headerText.IndexOf("ΕΙΔΙΚ", StringComparison.OrdinalIgnoreCase) >= 0)
                                 colMap["SPECIALTY"] = c;
+                            else if (headerText.IndexOf("ΕΝΑΡΞ", StringComparison.OrdinalIgnoreCase) >= 0 || headerText.IndexOf("ΤΟΠΟΘΕΤ", StringComparison.OrdinalIgnoreCase) >= 0 || headerText.IndexOf("ΗΜΕΡΟΜ", StringComparison.OrdinalIgnoreCase) >= 0)
+                                colMap["STARTDATE"] = c;
                         }
                     }
                 }
@@ -183,10 +187,17 @@ namespace Dynamologio.ImportExport.Excel.Import
                     string asm = colMap.TryGetValue("ASM", out var cAsm) ? GetCellString(row, cAsm) : "";
                     string unitStr = colMap.TryGetValue("UNIT", out var cUn) ? GetCellString(row, cUn) : "";
                     string specStr = colMap.TryGetValue("SPECIALTY", out var cSp) ? GetCellString(row, cSp) : "";
+                    string dateStr = colMap.TryGetValue("STARTDATE", out var cDt) ? GetCellString(row, cDt) : "";
 
                     if (string.IsNullOrWhiteSpace(lastName) && string.IsNullOrWhiteSpace(firstName))
                     {
                         continue;
+                    }
+
+                    DateTime? parsedStartDate = null;
+                    if (!string.IsNullOrWhiteSpace(dateStr) && DateTime.TryParse(dateStr, out var d))
+                    {
+                        parsedStartDate = d;
                     }
 
                     var rowPreview = new ImportRowPreview
@@ -197,7 +208,8 @@ namespace Dynamologio.ImportExport.Excel.Import
                         FirstName = firstName,
                         RankName = rankStr,
                         UnitName = unitStr,
-                        Specialty = specStr
+                        Specialty = specStr,
+                        EffectiveStartDate = parsedStartDate ?? defaultEffectiveDate
                     };
 
                     // Validate Rank (NO SILENT DEFAULT GUESSING)
@@ -238,7 +250,7 @@ namespace Dynamologio.ImportExport.Excel.Import
                         }
                     }
 
-                    // Find Existing Person by ASM or Full Name
+                    // Find Existing Person by ASM or Full Name (with duplicate name ambiguity protection)
                     Personnel existingPerson = null;
                     if (!string.IsNullOrWhiteSpace(asm))
                     {
@@ -247,9 +259,20 @@ namespace Dynamologio.ImportExport.Excel.Import
 
                     if (existingPerson == null && !string.IsNullOrWhiteSpace(lastName))
                     {
-                        existingPerson = allPersonnel.FirstOrDefault(p =>
+                        var matchingByName = allPersonnel.Where(p =>
                             string.Equals(p.LastName?.Trim(), lastName.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(p.FirstName?.Trim(), firstName.Trim(), StringComparison.OrdinalIgnoreCase));
+                            string.Equals(p.FirstName?.Trim(), firstName.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+
+                        if (matchingByName.Count > 1)
+                        {
+                            // SEC-IMP-004: Flag duplicate name ambiguity
+                            rowPreview.Action = ImportRowAction.ErrorInvalid;
+                            rowPreview.ValidationMessages.Add($"Εντοπίστηκαν πολλαπλά πρόσωπα ({matchingByName.Count}) με το ονοματεπώνυμο '{lastName} {firstName}' χωρίς ΑΣΜ. Απαιτείται ΑΣΜ για ασφαλή ταυτοποίηση.");
+                        }
+                        else if (matchingByName.Count == 1)
+                        {
+                            existingPerson = matchingByName[0];
+                        }
                     }
 
                     if (rowPreview.Action != ImportRowAction.ErrorInvalid)
@@ -298,76 +321,109 @@ namespace Dynamologio.ImportExport.Excel.Import
             return report;
         }
 
-        public ImportBatch CommitImport(ImportPreviewReport previewReport, IUnitOfWork uow, string operatorUsername = "OPERATOR")
+        public ImportBatch CommitImport(ImportPreviewReport previewReport, IUnitOfWork uow, string operatorUsername = null, DateTime? explicitEffectiveDate = null)
         {
-            if (previewReport == null || previewReport.Rows == null || previewReport.Rows.Count == 0)
+            if (previewReport == null || !previewReport.CanCommit)
             {
-                throw new InvalidOperationException("Δεν υπάρχουν εγγραφές προς εισαγωγή.");
+                throw new InvalidOperationException("Η παρτίδα δεν είναι έτοιμη για εισαγωγή (περιέχει σφάλματα ή είναι κενή).");
             }
 
-            if (!previewReport.CanCommit)
+            string actor = !string.IsNullOrWhiteSpace(operatorUsername) ? operatorUsername : $"{Environment.UserDomainName}\\{Environment.UserName}";
+            if (string.IsNullOrWhiteSpace(actor) || actor == "\\") actor = Environment.UserName;
+
+            var batch = new ImportBatch
             {
-                throw new InvalidOperationException($"Αδυναμία εκτέλεσης εισαγωγής: Εντοπίστηκαν {previewReport.ErrorCount} σφάλματα επικύρωσης.");
-            }
+                FileName = previewReport.FileName,
+                Sha256Hash = previewReport.FileSha256,
+                TotalRecordsProcessed = previewReport.TotalRows,
+                InsertedCount = previewReport.NewCount,
+                UpdatedCount = previewReport.UpdateCount,
+                WarningCount = previewReport.WarningCount,
+                SummaryNotes = $"Εισαγωγή από {actor}: {previewReport.NewCount} νέοι, {previewReport.UpdateCount} ενημερωμένοι."
+            };
+
+            DateTime effectiveStart = explicitEffectiveDate ?? DateTime.Today;
 
             uow.BeginTransaction();
             try
             {
-                var batch = new ImportBatch
-                {
-                    FileName = previewReport.FileName,
-                    Sha256Hash = previewReport.FileSha256,
-                    TotalRecordsProcessed = previewReport.TotalRows,
-                    InsertedCount = previewReport.NewCount,
-                    UpdatedCount = previewReport.UpdateCount,
-                    WarningCount = previewReport.WarningCount,
-                    SummaryNotes = $"Εισαγωγή από αρχείο Excel '{previewReport.FileName}' ({previewReport.NewCount} νέες, {previewReport.UpdateCount} ενημερώσεις)"
-                };
                 uow.ImportBatches.Insert(batch);
 
-                foreach (var row in previewReport.Rows)
+                foreach (var r in previewReport.Rows)
                 {
-                    if (row.Action == ImportRowAction.InsertNew)
+                    if (r.Action == ImportRowAction.InsertNew)
                     {
                         var newPerson = new Personnel
                         {
-                            MilitaryServiceNumber = row.MilitaryServiceNumber,
-                            LastName = row.LastName.Trim().ToUpperInvariant(),
-                            FirstName = row.FirstName.Trim().ToUpperInvariant(),
-                            FatherName = row.FatherName.Trim().ToUpperInvariant(),
-                            RankId = row.ResolvedRank?.Id ?? Guid.Empty,
-                            Category = row.ResolvedRank?.Category ?? PersonnelCategory.Conscript,
-                            OrganisationUnitId = row.ResolvedUnit?.Id ?? Guid.Empty,
-                            Specialty = row.Specialty,
-                            StrengthStartDate = DateTime.Today,
-                            CreatedBy = operatorUsername,
-                            ModifiedBy = operatorUsername
+                            MilitaryServiceNumber = r.MilitaryServiceNumber ?? string.Empty,
+                            LastName = r.LastName ?? string.Empty,
+                            FirstName = r.FirstName ?? string.Empty,
+                            FatherName = r.FatherName ?? string.Empty,
+                            RankId = r.ResolvedRank?.Id ?? Guid.Empty,
+                            OrganisationUnitId = r.ResolvedUnit?.Id ?? Guid.Empty,
+                            Specialty = r.Specialty ?? string.Empty,
+                            StrengthStartDate = r.EffectiveStartDate ?? effectiveStart,
+                            IsArchived = false,
+                            CreatedAt = DateTime.UtcNow
                         };
+
                         uow.Personnel.Insert(newPerson);
-                    }
-                    else if (row.Action == ImportRowAction.UpdateExisting && row.TargetPerson != null)
-                    {
-                        if (!string.IsNullOrWhiteSpace(row.MilitaryServiceNumber))
-                            row.TargetPerson.MilitaryServiceNumber = row.MilitaryServiceNumber;
 
-                        if (row.ResolvedRank != null)
+                        // Audit logging inside same transaction
+                        uow.AuditEvents.Insert(new AuditEvent
                         {
-                            row.TargetPerson.RankId = row.ResolvedRank.Id;
-                            row.TargetPerson.Category = row.ResolvedRank.Category;
-                        }
+                            Username = actor,
+                            Action = AuditAction.Create,
+                            EntityType = nameof(Personnel),
+                            EntityId = newPerson.Id.ToString(),
+                            Summary = $"Εισαγωγή νέου στελέχους: {newPerson.FullName} ({r.ResolvedRank?.ShortName})",
+                            NewValueJson = JsonConvert.SerializeObject(newPerson),
+                            ImportBatchId = batch.Id,
+                            AppVersion = "1.0.0.0"
+                        });
+                    }
+                    else if (r.Action == ImportRowAction.UpdateExisting && r.TargetPerson != null)
+                    {
+                        var person = r.TargetPerson;
+                        var oldJson = JsonConvert.SerializeObject(person);
 
-                        if (row.ResolvedUnit != null)
-                            row.TargetPerson.OrganisationUnitId = row.ResolvedUnit.Id;
+                        if (r.ResolvedRank != null) person.RankId = r.ResolvedRank.Id;
+                        if (r.ResolvedUnit != null) person.OrganisationUnitId = r.ResolvedUnit.Id;
+                        if (!string.IsNullOrWhiteSpace(r.Specialty)) person.Specialty = r.Specialty;
+                        if (!string.IsNullOrWhiteSpace(r.MilitaryServiceNumber)) person.MilitaryServiceNumber = r.MilitaryServiceNumber;
 
-                        if (!string.IsNullOrWhiteSpace(row.Specialty))
-                            row.TargetPerson.Specialty = row.Specialty;
+                        person.ModifiedAt = DateTime.UtcNow;
+                        person.ModifiedBy = actor;
+                        uow.Personnel.Update(person);
 
-                        row.TargetPerson.ModifiedBy = operatorUsername;
-                        row.TargetPerson.ModifiedAt = DateTime.Now;
-
-                        uow.Personnel.Update(row.TargetPerson);
+                        // Audit logging inside same transaction
+                        uow.AuditEvents.Insert(new AuditEvent
+                        {
+                            Username = actor,
+                            Action = AuditAction.Update,
+                            EntityType = nameof(Personnel),
+                            EntityId = person.Id.ToString(),
+                            Summary = $"Ενημέρωση στοιχείων από εισαγωγή: {person.FullName} [{r.FullDiffSummary}]",
+                            OldValueJson = oldJson,
+                            NewValueJson = JsonConvert.SerializeObject(person),
+                            ImportBatchId = batch.Id,
+                            AppVersion = "1.0.0.0"
+                        });
                     }
                 }
+
+                // Batch Audit Event
+                uow.AuditEvents.Insert(new AuditEvent
+                {
+                    Username = actor,
+                    Action = AuditAction.Import,
+                    EntityType = nameof(ImportBatch),
+                    EntityId = batch.Id.ToString(),
+                    Summary = $"Ολοκλήρωση παρτίδας εισαγωγής '{batch.FileName}' ({batch.InsertedCount} νέοι, {batch.UpdatedCount} ενημερωμένοι)",
+                    NewValueJson = JsonConvert.SerializeObject(batch),
+                    ImportBatchId = batch.Id,
+                    AppVersion = "1.0.0.0"
+                });
 
                 uow.Commit();
                 return batch;
@@ -379,11 +435,23 @@ namespace Dynamologio.ImportExport.Excel.Import
             }
         }
 
-        private static string GetCellString(IRow row, int cellIndex)
+        private static string GetCellString(IRow row, int colIndex)
         {
-            var cell = row.GetCell(cellIndex);
+            if (row == null || colIndex < 0) return string.Empty;
+            var cell = row.GetCell(colIndex);
             if (cell == null) return string.Empty;
-            return cell.ToString().Trim();
+
+            switch (cell.CellType)
+            {
+                case CellType.String:
+                    return cell.StringCellValue?.Trim() ?? string.Empty;
+                case CellType.Numeric:
+                    return cell.NumericCellValue.ToString();
+                case CellType.Boolean:
+                    return cell.BooleanCellValue.ToString();
+                default:
+                    return cell.ToString()?.Trim() ?? string.Empty;
+            }
         }
 
         private static string ComputeSha256(string filePath)
