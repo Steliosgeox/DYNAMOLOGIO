@@ -20,6 +20,9 @@ namespace Dynamologio.App.ViewModels
         private readonly IBackupService _backupService;
         private readonly IDiagnosticPackageService _diagnosticService;
         private readonly IAuditService _auditService;
+        private readonly IPersonnelService _personnelService;
+        private readonly IAbsenceService _absenceService;
+        private readonly IDutyService _dutyService;
         private readonly IClock _clock;
 
         private object _currentViewModel;
@@ -74,7 +77,10 @@ namespace Dynamologio.App.ViewModels
             IBackupService backupService,
             IDiagnosticPackageService diagnosticService,
             IAuditService auditService,
-            IClock clock)
+            IClock clock,
+            IPersonnelService personnelService = null,
+            IAbsenceService absenceService = null,
+            IDutyService dutyService = null)
         {
             _uow = uow ?? throw new ArgumentNullException(nameof(uow));
             _statusEngine = statusEngine ?? throw new ArgumentNullException(nameof(statusEngine));
@@ -87,11 +93,15 @@ namespace Dynamologio.App.ViewModels
             _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
             _clock = clock ?? SystemClock.Instance;
 
+            _personnelService = personnelService ?? new PersonnelService(_uow, _auditService);
+            _absenceService = absenceService ?? new AbsenceService(_uow, _auditService);
+            _dutyService = dutyService ?? new DutyService(_uow, _auditService);
+
             DashboardVM = new DashboardViewModel(_uow, _strengthCalculator, _clock, this);
             DynamologioVM = new DynamologioViewModel(_uow, _strengthCalculator, _reportService, _clock, this);
-            PersonnelVM = new PersonnelViewModel(_uow, _statusEngine, _conflictEngine, _auditService, _clock, this);
-            AbsencesVM = new AbsencesViewModel(_uow, _statusEngine, _conflictEngine, _auditService, _clock, this);
-            ServicesVM = new ServicesViewModel(_uow, _conflictEngine, _auditService, _clock, this);
+            PersonnelVM = new PersonnelViewModel(_uow, _statusEngine, _conflictEngine, _personnelService, _clock, this);
+            AbsencesVM = new AbsencesViewModel(_uow, _statusEngine, _conflictEngine, _absenceService, _clock, this);
+            ServicesVM = new ServicesViewModel(_uow, _conflictEngine, _dutyService, _clock, this);
             ReportsVM = new ReportsViewModel(_uow, _strengthCalculator, _reportService, _clock, this);
             ImportExportVM = new ImportExportViewModel(_uow, _importService, this);
             HistoryVM = new HistoryViewModel(_uow, _clock, this);
@@ -154,21 +164,17 @@ namespace Dynamologio.App.ViewModels
                 case "ImportExport":
                     CurrentViewModel = ImportExportVM;
                     break;
+                case "DataValidation":
+                    DataValidationVM.LoadData();
+                    CurrentViewModel = DataValidationVM;
+                    break;
                 case "History":
                     HistoryVM.LoadData();
                     CurrentViewModel = HistoryVM;
                     break;
-                case "DataValidation":
-                    DataValidationVM.ScanData();
-                    CurrentViewModel = DataValidationVM;
-                    break;
                 case "Settings":
                     SettingsVM.LoadData();
                     CurrentViewModel = SettingsVM;
-                    break;
-                default:
-                    DashboardVM.LoadData();
-                    CurrentViewModel = DashboardVM;
                     break;
             }
         }

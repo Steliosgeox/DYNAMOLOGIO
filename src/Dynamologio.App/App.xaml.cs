@@ -29,18 +29,22 @@ namespace Dynamologio.App
             // Hook Unhandled Exception Handlers
             AppDomain.CurrentDomain.UnhandledException += (s, args) =>
             {
-                LogUnhandledException(args.ExceptionObject as Exception, "AppDomain");
+                LogUnhandledException(args.ExceptionObject as Exception, "AppDomain_Fatal");
             };
 
             DispatcherUnhandledException += (s, args) =>
             {
-                LogUnhandledException(args.Exception, "Dispatcher");
-                args.Handled = true;
+                LogUnhandledException(args.Exception, "Dispatcher_Fatal");
+                
+                // Do not blindly swallow unknown critical integrity errors
                 MessageBox.Show(
-                    $"Παρουσιάστηκε μη αναμενόμενο σφάλμα:\n\n{args.Exception.Message}\n\nΤα τεχνικά στοιχεία καταγράφηκαν στο αρχείο σφαλμάτων.",
-                    "Σφάλμα Εφαρμογής",
+                    $"Παρουσιάστηκε κρίσιμο μη αναμενόμενο σφάλμα:\n\n{args.Exception.Message}\n\nΓια λόγους ασφαλείας και ακεραιότητας των δεδομένων, η εφαρμογή θα τερματιστεί.",
+                    "Κρίσιμο Σφάλμα Συστήματος",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    MessageBoxImage.Error);
+
+                args.Handled = true;
+                Shutdown(1);
             };
 
             // 1. Enforce el-GR culture throughout application runtime
@@ -65,6 +69,10 @@ namespace Dynamologio.App
                 IAuditService auditService = new AuditService(_unitOfWork);
                 IBackupService backupService = new BackupService(_unitOfWork, _dbContext.DbFilePath);
                 IDiagnosticPackageService diagnosticService = new DiagnosticPackageService(_unitOfWork, _dbContext.DbFilePath);
+
+                IPersonnelService personnelService = new PersonnelService(_unitOfWork, auditService);
+                IAbsenceService absenceService = new AbsenceService(_unitOfWork, auditService);
+                IDutyService dutyService = new DutyService(_unitOfWork, auditService);
 
                 IExcelTemplateWriter templateWriter = new NpoiTemplateWriter();
                 IReportGeneratorService reportService = new ReportGeneratorService(_unitOfWork, strengthCalculator, templateWriter);
@@ -91,7 +99,10 @@ namespace Dynamologio.App
                     backupService,
                     diagnosticService,
                     auditService,
-                    clock);
+                    clock,
+                    personnelService,
+                    absenceService,
+                    dutyService);
 
                 var mainWindow = new MainWindow
                 {
@@ -102,6 +113,7 @@ namespace Dynamologio.App
             }
             catch (Exception ex)
             {
+                LogUnhandledException(ex, "Startup_Fatal");
                 MessageBox.Show(
                     $"Κρίσιμο σφάλμα κατά την εκκίνηση της εφαρμογής:\n\n{ex.Message}\n\n{ex.StackTrace}",
                     "Σφάλμα Εκκίνησης ΔΥΝΑΜΟΛΟΓΙΟ",
@@ -118,25 +130,26 @@ namespace Dynamologio.App
             try
             {
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-                if (string.IsNullOrEmpty(appData)) appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string logDir = Path.Combine(appData, "Dynamologio", "Logs");
-                if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+                if (string.IsNullOrEmpty(appData))
+                {
+                    appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                }
 
-                string logFile = Path.Combine(logDir, "app_crash.log");
-                string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}] {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n\n";
-                File.AppendAllText(logFile, logEntry);
+                string logFolder = Path.Combine(appData, "Dynamologio", "Logs");
+                if (!Directory.Exists(logFolder))
+                {
+                    Directory.CreateDirectory(logFolder);
+                }
+
+                string logFile = Path.Combine(logFolder, "app_crash.log");
+                string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}] {ex.GetType().FullName}: {ex.Message}\nStackTrace:\n{ex.StackTrace}\n\n";
+
+                File.AppendAllText(logFile, entry);
             }
             catch
             {
-                // Silent fail
+                // Fallback suppression for logger failure
             }
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            _unitOfWork?.Dispose();
-            _dbContext?.Dispose();
-            base.OnExit(e);
         }
     }
 }

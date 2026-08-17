@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -31,7 +30,7 @@ namespace Dynamologio.App.ViewModels
     {
         private readonly IUnitOfWork _uow;
         private readonly IConflictEngine _conflictEngine;
-        private readonly IAuditService _auditService;
+        private readonly IDutyService _dutyService;
         private readonly IClock _clock;
         private readonly MainViewModel _mainVM;
 
@@ -76,13 +75,13 @@ namespace Dynamologio.App.ViewModels
         public ServicesViewModel(
             IUnitOfWork uow,
             IConflictEngine conflictEngine,
-            IAuditService auditService,
+            IDutyService dutyService,
             IClock clock,
             MainViewModel mainVM)
         {
             _uow = uow;
             _conflictEngine = conflictEngine;
-            _auditService = auditService;
+            _dutyService = dutyService;
             _clock = clock ?? SystemClock.Instance;
             _mainVM = mainVM;
 
@@ -186,8 +185,7 @@ namespace Dynamologio.App.ViewModels
                 if (proceed != MessageBoxResult.Yes) return;
             }
 
-            _uow.ServiceAssignments.Insert(assignment);
-            _auditService.LogAction(AuditAction.Create, "ServiceAssignment", assignment.Id.ToString(), $"Ανάθεση υπηρεσίας {SelectedServiceType.Name} σε {SelectedPerson.FullName} για {SelectedDate:dd/MM/yyyy}");
+            _dutyService.AssignDuty(assignment, $"Ανάθεση υπηρεσίας {SelectedServiceType.Name} σε {SelectedPerson.FullName} για {SelectedDate:dd/MM/yyyy}");
 
             Location = string.Empty;
             Notes = string.Empty;
@@ -206,9 +204,7 @@ namespace Dynamologio.App.ViewModels
 
             if (res == MessageBoxResult.Yes)
             {
-                item.Assignment.IsCancelled = true;
-                _uow.ServiceAssignments.Update(item.Assignment);
-                _auditService.LogAction(AuditAction.Cancel, "ServiceAssignment", item.Assignment.Id.ToString(), $"Ακύρωση υπηρεσίας {item.PersonFullName}");
+                _dutyService.CancelDuty(item.Assignment.Id, $"Ακύρωση υπηρεσίας {item.PersonFullName}");
                 LoadData();
             }
         }

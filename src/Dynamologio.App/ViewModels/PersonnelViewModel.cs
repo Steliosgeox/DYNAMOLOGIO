@@ -18,7 +18,7 @@ namespace Dynamologio.App.ViewModels
         private readonly IUnitOfWork _uow;
         private readonly IStatusEngine _statusEngine;
         private readonly IConflictEngine _conflictEngine;
-        private readonly IAuditService _auditService;
+        private readonly IPersonnelService _personnelService;
         private readonly IClock _clock;
         private readonly MainViewModel _mainVM;
 
@@ -76,14 +76,14 @@ namespace Dynamologio.App.ViewModels
             IUnitOfWork uow,
             IStatusEngine statusEngine,
             IConflictEngine conflictEngine,
-            IAuditService auditService,
+            IPersonnelService personnelService,
             IClock clock,
             MainViewModel mainVM)
         {
             _uow = uow;
             _statusEngine = statusEngine;
             _conflictEngine = conflictEngine;
-            _auditService = auditService;
+            _personnelService = personnelService;
             _clock = clock ?? SystemClock.Instance;
             _mainVM = mainVM;
 
@@ -167,11 +167,10 @@ namespace Dynamologio.App.ViewModels
 
         private void AddPerson()
         {
-            var editorVM = new PersonEditorViewModel(_uow, _conflictEngine);
+            var editorVM = new PersonEditorViewModel(_uow, _conflictEngine, _personnelService);
             var dialog = new PersonEditorDialog(editorVM);
             if (dialog.ShowDialog() == true)
             {
-                _auditService.LogAction(AuditAction.Create, "Personnel", editorVM.MilitaryServiceNumber, $"Προσθήκη νέου προσωπικού {editorVM.LastName} {editorVM.FirstName}");
                 LoadData();
             }
         }
@@ -180,11 +179,10 @@ namespace Dynamologio.App.ViewModels
         {
             if (SelectedPerson?.Person == null) return;
 
-            var editorVM = new PersonEditorViewModel(_uow, _conflictEngine, SelectedPerson.Person);
+            var editorVM = new PersonEditorViewModel(_uow, _conflictEngine, _personnelService, SelectedPerson.Person);
             var dialog = new PersonEditorDialog(editorVM);
             if (dialog.ShowDialog() == true)
             {
-                _auditService.LogAction(AuditAction.Update, "Personnel", SelectedPerson.Person.Id.ToString(), $"Ενημέρωση στοιχείων {SelectedPerson.Person.FullName}");
                 LoadData();
             }
         }
@@ -200,10 +198,7 @@ namespace Dynamologio.App.ViewModels
 
             if (res == MessageBoxResult.Yes)
             {
-                SelectedPerson.Person.IsArchived = true;
-                SelectedPerson.Person.StrengthEndDate = _clock.Today;
-                _uow.Personnel.Update(SelectedPerson.Person);
-                _auditService.LogAction(AuditAction.Archive, "Personnel", SelectedPerson.Person.Id.ToString(), $"Αρχειοθέτηση {SelectedPerson.Person.FullName}");
+                _personnelService.ArchivePerson(SelectedPerson.Person.Id, $"Αρχειοθέτηση {SelectedPerson.Person.FullName}");
                 LoadData();
             }
         }

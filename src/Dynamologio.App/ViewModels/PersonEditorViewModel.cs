@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
+using Dynamologio.Infrastructure.Services;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -12,6 +13,7 @@ namespace Dynamologio.App.ViewModels
     {
         private readonly IUnitOfWork _uow;
         private readonly IConflictEngine _conflictEngine;
+        private readonly IPersonnelService _personnelService;
         private readonly Personnel _editingPerson;
         private readonly bool _isNew;
 
@@ -50,10 +52,15 @@ namespace Dynamologio.App.ViewModels
         public ICommand SaveCommand { get; }
         public ICommand CancelCommand { get; }
 
-        public PersonEditorViewModel(IUnitOfWork uow, IConflictEngine conflictEngine, Personnel existingPerson = null)
+        public PersonEditorViewModel(
+            IUnitOfWork uow,
+            IConflictEngine conflictEngine,
+            IPersonnelService personnelService,
+            Personnel existingPerson = null)
         {
             _uow = uow;
             _conflictEngine = conflictEngine;
+            _personnelService = personnelService;
             _editingPerson = existingPerson;
             _isNew = existingPerson == null;
 
@@ -88,6 +95,16 @@ namespace Dynamologio.App.ViewModels
             ErrorMessage = string.Empty;
 
             var target = _editingPerson ?? new Personnel();
+            var oldPerson = _editingPerson != null ? new Personnel
+            {
+                Id = _editingPerson.Id,
+                LastName = _editingPerson.LastName,
+                FirstName = _editingPerson.FirstName,
+                MilitaryServiceNumber = _editingPerson.MilitaryServiceNumber,
+                RankId = _editingPerson.RankId,
+                OrganisationUnitId = _editingPerson.OrganisationUnitId
+            } : null;
+
             target.MilitaryServiceNumber = (MilitaryServiceNumber ?? "").Trim();
             target.LastName = (LastName ?? "").Trim().ToUpperInvariant();
             target.FirstName = (FirstName ?? "").Trim().ToUpperInvariant();
@@ -110,17 +127,24 @@ namespace Dynamologio.App.ViewModels
                 return;
             }
 
-            if (_isNew)
+            try
             {
-                _uow.Personnel.Insert(target);
-            }
-            else
-            {
-                _uow.Personnel.Update(target);
-            }
+                if (_isNew)
+                {
+                    _personnelService.CreatePerson(target, "Δημιουργία νέου προσώπου μέσω διαλόγου");
+                }
+                else
+                {
+                    _personnelService.UpdatePerson(target, "Ενημέρωση στοιχείων προσώπου μέσω διαλόγου", oldPerson);
+                }
 
-            DialogResult = true;
-            CloseAction?.Invoke();
+                DialogResult = true;
+                CloseAction?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Σφάλμα κατά την αποθήκευση: {ex.Message}";
+            }
         }
 
         private void Cancel()

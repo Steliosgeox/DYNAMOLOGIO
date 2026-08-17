@@ -35,7 +35,7 @@ namespace Dynamologio.App.ViewModels
         private readonly IUnitOfWork _uow;
         private readonly IStatusEngine _statusEngine;
         private readonly IConflictEngine _conflictEngine;
-        private readonly IAuditService _auditService;
+        private readonly IAbsenceService _absenceService;
         private readonly IClock _clock;
         private readonly MainViewModel _mainVM;
 
@@ -133,14 +133,14 @@ namespace Dynamologio.App.ViewModels
             IUnitOfWork uow,
             IStatusEngine statusEngine,
             IConflictEngine conflictEngine,
-            IAuditService auditService,
+            IAbsenceService absenceService,
             IClock clock,
             MainViewModel mainVM)
         {
             _uow = uow;
             _statusEngine = statusEngine;
             _conflictEngine = conflictEngine;
-            _auditService = auditService;
+            _absenceService = absenceService;
             _clock = clock ?? SystemClock.Instance;
             _mainVM = mainVM;
 
@@ -275,12 +275,9 @@ namespace Dynamologio.App.ViewModels
                 Comment = (Comment ?? "").Trim()
             };
 
-            _uow.StatusEvents.Insert(newEvent);
-            _auditService.LogAction(
-                AuditAction.Create,
-                "StatusEvent",
-                newEvent.Id.ToString(),
-                $"Καταχώρηση {SelectedStatusType.Name} για {SelectedPerson.FullName} ({startAt:dd/MM/yyyy} ➔ {endExclusive:dd/MM/yyyy})");
+            _absenceService.CreateAbsence(
+                newEvent,
+                $"Καταχώρηση {SelectedStatusType.Name} για {SelectedPerson.FullName} ({startAt:dd/MM/yyyy} -> {endExclusive:dd/MM/yyyy})");
 
             InlineSuccessMessage = $"Επιτυχής καταχώρηση: {SelectedPerson.FullName} [{SelectedStatusType.Name}] έως {endExclusive:dd/MM/yyyy}.";
 
@@ -301,10 +298,7 @@ namespace Dynamologio.App.ViewModels
 
             if (res == System.Windows.MessageBoxResult.Yes)
             {
-                item.Event.IsCancelled = true;
-                item.Event.CancelledAt = _clock.Now;
-                _uow.StatusEvents.Update(item.Event);
-                _auditService.LogAction(AuditAction.Cancel, "StatusEvent", item.Event.Id.ToString(), $"Ακύρωση απουσίας {item.PersonFullName}");
+                _absenceService.CancelAbsence(item.Event.Id, $"Ακύρωση απουσίας {item.PersonFullName}");
                 LoadData();
             }
         }
