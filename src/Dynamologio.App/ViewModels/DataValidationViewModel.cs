@@ -19,13 +19,12 @@ namespace Dynamologio.App.ViewModels
         public string SeverityLabel => Severity == ConflictSeverity.Error ? "ΣΦΑΛΜΑ" : "ΠΡΟΕΙΔΟΠΟΙΗΣΗ";
     }
 
-    public class DataValidationViewModel : ViewModelBase
+    public class DataValidationViewModel : ViewModelBase, Dynamologio.App.Navigation.IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IConflictEngine _conflictEngine;
         private readonly IStatusEngine _statusEngine;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
 
         public ObservableCollection<ValidationIssueItem> IssuesList { get; } = new ObservableCollection<ValidationIssueItem>();
 
@@ -38,16 +37,19 @@ namespace Dynamologio.App.ViewModels
             IUnitOfWork uow,
             IConflictEngine conflictEngine,
             IStatusEngine statusEngine,
-            IClock clock,
-            MainViewModel mainVM)
+            IClock clock)
         {
             _uow = uow;
             _conflictEngine = conflictEngine;
             _statusEngine = statusEngine;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
             ScanDataCommand = new RelayCommand(ScanData);
+        }
+
+        public void Activate()
+        {
+            ScanData();
         }
 
         public void LoadData()

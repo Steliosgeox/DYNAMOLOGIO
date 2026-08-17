@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using Dynamologio.App.Controls;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
@@ -31,14 +32,13 @@ namespace Dynamologio.App.ViewModels
         public string Comment => Event?.Comment ?? "";
     }
 
-    public class AbsencesViewModel : ViewModelBase
+    public class AbsencesViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IStatusEngine _statusEngine;
         private readonly IConflictEngine _conflictEngine;
         private readonly IAbsenceService _absenceService;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
 
         public ObservableCollection<AbsencePresentationItem> ActiveEventsList { get; } = new ObservableCollection<AbsencePresentationItem>();
         public ObservableCollection<AbsencePresentationItem> PlannedEventsList { get; } = new ObservableCollection<AbsencePresentationItem>();
@@ -146,15 +146,13 @@ namespace Dynamologio.App.ViewModels
             IStatusEngine statusEngine,
             IConflictEngine conflictEngine,
             IAbsenceService absenceService,
-            IClock clock,
-            MainViewModel mainVM)
+            IClock clock)
         {
             _uow = uow;
             _statusEngine = statusEngine;
             _conflictEngine = conflictEngine;
             _absenceService = absenceService;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
             _startDate = _clock.Today;
             _returnDate = _clock.Today.AddDays(5);
@@ -173,6 +171,11 @@ namespace Dynamologio.App.ViewModels
 
             SaveAbsenceCommand = new RelayCommand(SaveAbsence);
             CancelAbsenceCommand = new RelayCommand(param => CancelAbsence(param as AbsencePresentationItem));
+        }
+
+        public void Activate()
+        {
+            LoadData();
         }
 
         public void LoadData()
@@ -206,7 +209,6 @@ namespace Dynamologio.App.ViewModels
             if (SelectedPerson == null) SelectedPerson = PersonnelList.FirstOrDefault();
 
             var now = _clock.Now;
-            var today = _clock.Today;
 
             ActiveEventsList.Clear();
             PlannedEventsList.Clear();
@@ -216,12 +218,12 @@ namespace Dynamologio.App.ViewModels
             foreach (var ev in allEvents)
             {
                 persons.TryGetValue(ev.PersonnelId, out var person);
-                Rank rank = null;
-                OrganisationUnit unit = null;
+                Rank rank2 = null;
+                OrganisationUnit unit2 = null;
                 if (person != null)
                 {
-                    ranks.TryGetValue(person.RankId, out rank);
-                    units.TryGetValue(person.OrganisationUnitId, out unit);
+                    ranks.TryGetValue(person.RankId, out rank2);
+                    units.TryGetValue(person.OrganisationUnitId, out unit2);
                 }
                 stTypes.TryGetValue(ev.StatusTypeId, out var sType);
 
@@ -229,8 +231,8 @@ namespace Dynamologio.App.ViewModels
                 {
                     Event = ev,
                     Person = person,
-                    Rank = rank,
-                    Unit = unit,
+                    Rank = rank2,
+                    Unit = unit2,
                     StatusType = sType
                 };
 
@@ -330,6 +332,7 @@ namespace Dynamologio.App.ViewModels
         {
             if (item?.Event == null) return;
 
+            // Will be moved to IConfirmationService in Commit 2
             var res = System.Windows.MessageBox.Show(
                 $"Θα ακυρωθεί η απουσία:\n{item.PersonFullName} - {item.ReasonName} ({item.StartDisplay} - {item.ReturnDisplay})\n\nΣυνέχεια;",
                 "Επιβεβαίωση Ακύρωσης",

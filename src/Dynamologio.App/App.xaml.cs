@@ -8,6 +8,7 @@ using Dynamologio.App.Views;
 using Dynamologio.Core.Engines;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.ImportExport.Excel;
+using Dynamologio.App.Navigation;
 using Dynamologio.ImportExport.Excel.Import;
 using Dynamologio.Infrastructure.LiteDb;
 using Dynamologio.Infrastructure.Migrations;
@@ -91,8 +92,10 @@ namespace Dynamologio.App
                     // Non-blocking auto backup
                 }
 
-                // 5. Initialize Main View & Coordinator
-                var mainViewModel = new MainViewModel(
+                // 5. Initialize Navigation & Shell State
+                INavigationService navigationService = new Dynamologio.App.Navigation.NavigationService();
+                IShellStateService shellStateService = new Dynamologio.App.Navigation.ShellStateService();
+                IViewModelFactory viewModelFactory = new Dynamologio.App.Navigation.ViewModelFactory(
                     _unitOfWork,
                     statusEngine,
                     strengthCalculator,
@@ -103,10 +106,19 @@ namespace Dynamologio.App
                     lifecycleCoordinator,
                     diagnosticService,
                     auditService,
-                    clock,
                     personnelService,
                     absenceService,
-                    dutyService);
+                    dutyService,
+                    clock,
+                    navigationService,
+                    shellStateService);
+
+                // 6. Initialize Main View & Coordinator
+                var mainViewModel = new MainViewModel(
+                    navigationService,
+                    viewModelFactory,
+                    shellStateService,
+                    _unitOfWork);
 
                 var mainWindow = new MainWindow
                 {

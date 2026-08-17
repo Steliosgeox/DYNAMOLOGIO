@@ -1,14 +1,12 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Input;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Core.Projections;
 using Dynamologio.Reporting.Services;
-using Microsoft.Win32;
 
 namespace Dynamologio.App.ViewModels
 {
@@ -20,13 +18,13 @@ namespace Dynamologio.App.ViewModels
         public string TargetScope { get; set; }
     }
 
-    public class ReportsViewModel : ViewModelBase
+    public class ReportsViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IStrengthCalculator _strengthCalculator;
         private readonly IReportGeneratorService _reportService;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
+        private readonly IShellStateService _shellState;
 
         public ObservableCollection<ReportCatalogItem> AvailableReports { get; } = new ObservableCollection<ReportCatalogItem>();
         public ObservableCollection<OrganisationUnit> UnitsList { get; } = new ObservableCollection<OrganisationUnit>();
@@ -94,13 +92,13 @@ namespace Dynamologio.App.ViewModels
             IStrengthCalculator strengthCalculator,
             IReportGeneratorService reportService,
             IClock clock,
-            MainViewModel mainVM)
+            IShellStateService shellState)
         {
             _uow = uow;
             _strengthCalculator = strengthCalculator;
             _reportService = reportService;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
 
             _selectedDate = _clock.Today;
 
@@ -143,6 +141,11 @@ namespace Dynamologio.App.ViewModels
             RefreshPreviewCommand = new RelayCommand(GeneratePreview);
         }
 
+        public void Activate()
+        {
+            LoadData();
+        }
+
         public void LoadData()
         {
             UnitsList.Clear();
@@ -176,9 +179,10 @@ namespace Dynamologio.App.ViewModels
 
         private void ExportExcel()
         {
+            // Will be moved to IFileDialogService + INotificationService in Commit 2
             try
             {
-                var sfd = new SaveFileDialog
+                var sfd = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "Excel Workbook (*.xlsx)|*.xlsx",
                     FileName = $"{SelectedReport.Type}_{SelectedDate:yyyyMMdd}.xlsx"
@@ -191,21 +195,22 @@ namespace Dynamologio.App.ViewModels
                         Type = SelectedReport.Type,
                         AsOfTimestamp = SelectedDate,
                         OrganisationUnitId = SelectedUnit?.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null,
-                        UnitTitle = _mainVM.UnitNameHeader
+                        UnitTitle = _shellState.UnitName
                     };
 
                     _reportService.ExportToExcel(req, sfd.FileName);
-                    MessageBox.Show($"Το αρχείο Excel δημιουργήθηκε επιτυχώς:\n{sfd.FileName}", "Εξαγωγή Αναφοράς", MessageBoxButton.OK, MessageBoxImage.Information);
+                    System.Windows.MessageBox.Show($"Το αρχείο Excel δημιουργήθηκε επιτυχώς:\n{sfd.FileName}", "Εξαγωγή Αναφοράς", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Σφάλμα εξαγωγής αναφοράς: {ex.Message}", "Σφάλμα Εξαγωγής", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Σφάλμα εξαγωγής αναφοράς: {ex.Message}", "Σφάλμα Εξαγωγής", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
         private void PrintReport()
         {
+            // Will be moved to IPrintService in Commit 2
             try
             {
                 var printDialog = new System.Windows.Controls.PrintDialog();
@@ -216,17 +221,17 @@ namespace Dynamologio.App.ViewModels
                         Type = SelectedReport.Type,
                         AsOfTimestamp = SelectedDate,
                         OrganisationUnitId = SelectedUnit?.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null,
-                        UnitTitle = _mainVM.UnitNameHeader
+                        UnitTitle = _shellState.UnitName
                     };
 
                     var doc = _reportService.GeneratePrintableDocument(req);
-                    IDocumentPaginatorSource dps = doc;
+                    System.Windows.Documents.IDocumentPaginatorSource dps = doc;
                     printDialog.PrintDocument(dps.DocumentPaginator, SelectedReport.Title);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Σφάλμα εκτύπωσης: {ex.Message}", "Σφάλμα Εκτύπωσης", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Σφάλμα εκτύπωσης: {ex.Message}", "Σφάλμα Εκτύπωσης", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
     }

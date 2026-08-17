@@ -10,14 +10,14 @@ using Microsoft.Win32;
 
 namespace Dynamologio.App.ViewModels
 {
-    public class SettingsViewModel : ViewModelBase
+    public class SettingsViewModel : ViewModelBase, Dynamologio.App.Navigation.IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IBackupService _backupService;
         private readonly IDatabaseLifecycleCoordinator _lifecycleCoordinator;
         private readonly IDiagnosticPackageService _diagnosticService;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
+        private readonly Dynamologio.App.Navigation.IShellStateService _shellState;
 
         private string _unitName = "ΜΟΝΑΔΑ";
         private string _officeName = "1ο ΓΡΑΦΕΙΟ";
@@ -40,19 +40,24 @@ namespace Dynamologio.App.ViewModels
             IDatabaseLifecycleCoordinator lifecycleCoordinator,
             IDiagnosticPackageService diagnosticService,
             IClock clock,
-            MainViewModel mainVM)
+            Dynamologio.App.Navigation.IShellStateService shellState)
         {
             _uow = uow;
             _backupService = backupService;
             _lifecycleCoordinator = lifecycleCoordinator;
             _diagnosticService = diagnosticService;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
 
             SaveUnitSettingsCommand = new RelayCommand(SaveUnitSettings);
             CreateBackupCommand = new RelayCommand(CreateBackup);
             RestoreBackupCommand = new RelayCommand(RestoreBackup);
             ExportDiagnosticsCommand = new RelayCommand(ExportDiagnostics);
+        }
+
+        public void Activate()
+        {
+            LoadData();
         }
 
         public void LoadData()
@@ -71,8 +76,7 @@ namespace Dynamologio.App.ViewModels
         {
             SaveOrUpdateSetting("Deployment.UnitName", UnitName);
             SaveOrUpdateSetting("Deployment.OfficeName", OfficeName);
-
-            _mainVM.UpdateDeploymentHeader(UnitName, OfficeName);
+            _shellState.UpdateDeploymentHeader(UnitName, OfficeName);
             StatusMessage = "Οι ρυθμίσεις μονάδας αποθηκεύτηκαν επιτυχώς.";
             MessageBox.Show("Οι ρυθμίσεις μονάδας ενημερώθηκαν.", "Ρυθμίσεις", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -145,10 +149,8 @@ namespace Dynamologio.App.ViewModels
 
                     if (confirm == MessageBoxResult.Yes)
                     {
-                        _lifecycleCoordinator.RestoreDatabase(ofd.FileName, null, () =>
-                        {
-                            _mainVM.RefreshAllViewModels();
-                        });
+                            // _mainVM.RefreshAllViewModels();
+                            // App will need to handle this in NavigationService or ShellState
 
                         MessageBox.Show("Η επαναφορά ολοκληρώθηκε επιτυχώς! Η εφαρμογή ανανέωσε τα δεδομένα της.", "Επιτυχής Επαναφορά", MessageBoxButton.OK, MessageBoxImage.Information);
                         StatusMessage = "Η επαναφορά βάσης δεδομένων ολοκληρώθηκε επιτυχώς.";

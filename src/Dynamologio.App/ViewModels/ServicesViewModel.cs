@@ -1,8 +1,8 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows;
 using System.Windows.Input;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
@@ -26,13 +26,12 @@ namespace Dynamologio.App.ViewModels
         public string Notes => Assignment?.Notes ?? "-";
     }
 
-    public class ServicesViewModel : ViewModelBase
+    public class ServicesViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IConflictEngine _conflictEngine;
         private readonly IDutyService _dutyService;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
 
         public ObservableCollection<ServicePresentationItem> DailyServicesList { get; } = new ObservableCollection<ServicePresentationItem>();
         public ObservableCollection<Personnel> PersonnelList { get; } = new ObservableCollection<Personnel>();
@@ -76,14 +75,12 @@ namespace Dynamologio.App.ViewModels
             IUnitOfWork uow,
             IConflictEngine conflictEngine,
             IDutyService dutyService,
-            IClock clock,
-            MainViewModel mainVM)
+            IClock clock)
         {
             _uow = uow;
             _conflictEngine = conflictEngine;
             _dutyService = dutyService;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
             _selectedDate = _clock.Today;
 
@@ -91,6 +88,11 @@ namespace Dynamologio.App.ViewModels
             CancelServiceCommand = new RelayCommand(param => CancelService(param as ServicePresentationItem));
             SetTodayCommand = new RelayCommand(() => SelectedDate = _clock.Today);
             SetTomorrowCommand = new RelayCommand(() => SelectedDate = _clock.Today.AddDays(1));
+        }
+
+        public void Activate()
+        {
+            LoadData();
         }
 
         public void LoadData()
@@ -181,8 +183,9 @@ namespace Dynamologio.App.ViewModels
             var warning = conflicts.FirstOrDefault(c => c.Severity == ConflictSeverity.Warning);
             if (warning != null)
             {
-                var proceed = MessageBox.Show($"{warning.Message}\n\nΕπιθυμείτε να συνεχίσετε με την καταχώρηση;", "Προειδοποίηση Σύγκρουσης", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (proceed != MessageBoxResult.Yes) return;
+                // Will be moved to IConfirmationService in Commit 2
+                var proceed = System.Windows.MessageBox.Show($"{warning.Message}\n\nΕπιθυμείτε να συνεχίσετε με την καταχώρηση;", "Προειδοποίηση Σύγκρουσης", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+                if (proceed != System.Windows.MessageBoxResult.Yes) return;
             }
 
             _dutyService.AssignDuty(assignment, $"Ανάθεση υπηρεσίας {SelectedServiceType.Name} σε {SelectedPerson.FullName} για {SelectedDate:dd/MM/yyyy}");
@@ -196,13 +199,14 @@ namespace Dynamologio.App.ViewModels
         {
             if (item?.Assignment == null) return;
 
-            var res = MessageBox.Show(
+            // Will be moved to IConfirmationService in Commit 2
+            var res = System.Windows.MessageBox.Show(
                 $"Θα ακυρωθεί η υπηρεσία:\n{item.RankName} {item.PersonFullName} - {item.ServiceName} ({item.HoursDisplay})\n\nΣυνέχεια;",
                 "Επιβεβαίωση Ακύρωσης",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question);
 
-            if (res == MessageBoxResult.Yes)
+            if (res == System.Windows.MessageBoxResult.Yes)
             {
                 _dutyService.CancelDuty(item.Assignment.Id, $"Ακύρωση υπηρεσίας {item.PersonFullName}");
                 LoadData();

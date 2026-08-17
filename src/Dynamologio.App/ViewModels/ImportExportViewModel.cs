@@ -1,18 +1,16 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Windows;
 using System.Windows.Input;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.ImportExport.Excel.Import;
-using Microsoft.Win32;
 
 namespace Dynamologio.App.ViewModels
 {
-    public class ImportExportViewModel : ViewModelBase
+    public class ImportExportViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IExcelImportService _importService;
-        private readonly MainViewModel _mainVM;
 
         private string _selectedFilePath = string.Empty;
         private ImportPreviewReport _previewReport;
@@ -30,20 +28,25 @@ namespace Dynamologio.App.ViewModels
         public ICommand AnalyzeFileCommand { get; }
         public ICommand CommitImportCommand { get; }
 
-        public ImportExportViewModel(IUnitOfWork uow, IExcelImportService importService, MainViewModel mainVM)
+        public ImportExportViewModel(IUnitOfWork uow, IExcelImportService importService)
         {
-            _uow = uow;
-            _importService = importService ?? new ExcelImportService();
-            _mainVM = mainVM;
+            _uow = uow ?? throw new ArgumentNullException(nameof(uow));
+            _importService = importService ?? throw new ArgumentNullException(nameof(importService));
 
             BrowseFileCommand = new RelayCommand(BrowseFile);
             AnalyzeFileCommand = new RelayCommand(AnalyzeFile, () => !string.IsNullOrEmpty(SelectedFilePath) && !IsBusy);
             CommitImportCommand = new RelayCommand(CommitImport, () => PreviewReport != null && PreviewReport.CanCommit && !IsBusy);
         }
 
+        public void Activate()
+        {
+            // ImportExport doesn't need auto-reload on navigation
+        }
+
         private void BrowseFile()
         {
-            var ofd = new OpenFileDialog
+            // Will be moved to IFileDialogService in Commit 2
+            var ofd = new Microsoft.Win32.OpenFileDialog
             {
                 Filter = "Excel Files (*.xlsx;*.xls)|*.xlsx;*.xls",
                 Title = "Επιλογή Αρχείου Excel Προσωπικού"
@@ -84,7 +87,8 @@ namespace Dynamologio.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα ανάλυσης: {ex.Message}";
-                MessageBox.Show(ex.Message, "Σφάλμα Ανάλυσης", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Will be moved to INotificationService in Commit 2
+                System.Windows.MessageBox.Show(ex.Message, "Σφάλμα Ανάλυσης", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
             finally
             {
@@ -96,13 +100,14 @@ namespace Dynamologio.App.ViewModels
         {
             if (PreviewReport == null || !PreviewReport.CanCommit) return;
 
-            var res = MessageBox.Show(
+            // Will be moved to IConfirmationService in Commit 2
+            var res = System.Windows.MessageBox.Show(
                 $"Επιβεβαίωση εκτέλεσης εισαγωγής:\n• {PreviewReport.NewCount} Νέες Εγγραφές\n• {PreviewReport.UpdateCount} Ενημερώσεις Στοιχείων\n\nΣυνέχεια;",
                 "Επιβεβαίωση Εισαγωγής",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question);
 
-            if (res != MessageBoxResult.Yes) return;
+            if (res != System.Windows.MessageBoxResult.Yes) return;
 
             try
             {
@@ -111,11 +116,11 @@ namespace Dynamologio.App.ViewModels
 
                 var batch = _importService.CommitImport(PreviewReport, _uow);
 
-                MessageBox.Show(
+                System.Windows.MessageBox.Show(
                     $"Η εισαγωγή ολοκληρώθηκε επιτυχώς!\nΑρ. Παρτίδας: {batch.Id}\nΝέες εγγραφές: {batch.InsertedCount}\nΕνημερώσεις: {batch.UpdatedCount}",
                     "Επιτυχής Εισαγωγή",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
 
                 StatusMessage = "Η εισαγωγή ολοκληρώθηκε επιτυχώς.";
                 PreviewReport = null;
@@ -125,7 +130,7 @@ namespace Dynamologio.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Σφάλμα εκτέλεσης εισαγωγής: {ex.Message}";
-                MessageBox.Show(ex.Message, "Σφάλμα Εισαγωγής", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show(ex.Message, "Σφάλμα Εισαγωγής", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
             finally
             {

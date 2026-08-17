@@ -641,7 +641,9 @@ namespace Dynamologio.Tests
                     var diagService = new DiagnosticPackageService(_uow, _tempDbPath);
                     var auditService = new AuditService(_uow);
 
-                    var mainVM = new MainViewModel(
+                    var navService = new Dynamologio.App.Navigation.NavigationService();
+                    var shellState = new Dynamologio.App.Navigation.ShellStateService();
+                    var factory = new Dynamologio.App.Navigation.ViewModelFactory(
                         _uow,
                         new StatusEngine(),
                         strengthCalc,
@@ -652,7 +654,18 @@ namespace Dynamologio.Tests
                         lifecycleCoordinator,
                         diagService,
                         auditService,
-                        _clock);
+                        new PersonnelService(_uow, auditService),
+                        new AbsenceService(_uow, auditService),
+                        new DutyService(_uow, auditService),
+                        _clock,
+                        navService,
+                        shellState);
+
+                    var mainVM = new MainViewModel(
+                        navService,
+                        factory,
+                        shellState,
+                        _uow);
 
                     string[] sections = new[] { "Dashboard", "Dynamologio", "Personnel", "Absences", "Services", "Reports", "ImportExport", "DataValidation", "History", "Settings" };
 
@@ -660,7 +673,10 @@ namespace Dynamologio.Tests
 
                     foreach (string section in sections)
                     {
-                        mainVM.Navigate(section);
+                        if (Enum.TryParse<Dynamologio.App.Navigation.NavigationSection>(section, out var parsedSection))
+                        {
+                            navService.Navigate(parsedSection);
+                        }
 
                         // Capture Complete MainWindow at 1366x768
                         RenderAndSaveScreenshot(mainWindow, 1366, 768, Path.Combine(screenshotsDir, $"MainWindow_{section}_1366x768.png"));

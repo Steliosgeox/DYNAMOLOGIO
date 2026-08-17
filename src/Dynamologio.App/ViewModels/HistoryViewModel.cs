@@ -7,11 +7,10 @@ using Dynamologio.Core.Models;
 
 namespace Dynamologio.App.ViewModels
 {
-    public class HistoryViewModel : ViewModelBase
+    public class HistoryViewModel : ViewModelBase, Dynamologio.App.Navigation.IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
 
         private string _searchText = string.Empty;
         private string _selectedEntityType = "Όλα";
@@ -43,13 +42,17 @@ namespace Dynamologio.App.ViewModels
         public ObservableCollection<AuditEvent> FilteredEventsList { get; } = new ObservableCollection<AuditEvent>();
         public ICommand RefreshCommand { get; }
 
-        public HistoryViewModel(IUnitOfWork uow, IClock clock, MainViewModel mainVM)
+        public HistoryViewModel(IUnitOfWork uow, IClock clock)
         {
             _uow = uow;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
             RefreshCommand = new RelayCommand(LoadData);
+        }
+
+        public void Activate()
+        {
+            FilterHistory();
         }
 
         public void LoadData()

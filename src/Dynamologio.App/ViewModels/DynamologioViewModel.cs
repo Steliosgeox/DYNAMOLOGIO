@@ -1,35 +1,37 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Models;
 using Dynamologio.Core.Projections;
 using Dynamologio.Reporting.Services;
-using Microsoft.Win32;
 
 namespace Dynamologio.App.ViewModels
 {
-    public class DynamologioViewModel : ViewModelBase
+    public enum TemplateVerificationState
+    {
+        Verified,
+        ShaMismatch,
+        Missing
+    }
+
+    public class DynamologioViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IStrengthCalculator _strengthCalculator;
         private readonly IReportGeneratorService _reportService;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
+        private readonly IShellStateService _shellState;
 
         public ObservableCollection<OrganisationUnit> OrganisationUnitsList { get; } = new ObservableCollection<OrganisationUnit>();
 
         private DateTime _selectedDate;
         private OrganisationUnit _selectedUnit;
         private UnitStrengthSnapshot _currentSnapshot;
-        private string _templateStatusText = "Πρότυπο: Επαληθευμένο";
-        private Brush _templateStatusBrush = new SolidColorBrush(Color.FromRgb(5, 150, 105));
-        private Brush _templateStatusBgBrush = new SolidColorBrush(Color.FromRgb(236, 253, 245));
-        private Brush _templateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(167, 243, 208));
+        private TemplateVerificationState _templateStatus = TemplateVerificationState.Verified;
+        private string _templateStatusMessage = "Πρότυπο: Επαληθευμένο";
 
         public DateTime SelectedDate
         {
@@ -61,28 +63,16 @@ namespace Dynamologio.App.ViewModels
             set => SetProperty(ref _currentSnapshot, value);
         }
 
-        public string TemplateStatusText
+        public TemplateVerificationState TemplateStatus
         {
-            get => _templateStatusText;
-            set => SetProperty(ref _templateStatusText, value);
+            get => _templateStatus;
+            set => SetProperty(ref _templateStatus, value);
         }
 
-        public Brush TemplateStatusBrush
+        public string TemplateStatusMessage
         {
-            get => _templateStatusBrush;
-            set => SetProperty(ref _templateStatusBrush, value);
-        }
-
-        public Brush TemplateStatusBgBrush
-        {
-            get => _templateStatusBgBrush;
-            set => SetProperty(ref _templateStatusBgBrush, value);
-        }
-
-        public Brush TemplateStatusBorderBrush
-        {
-            get => _templateStatusBorderBrush;
-            set => SetProperty(ref _templateStatusBorderBrush, value);
+            get => _templateStatusMessage;
+            set => SetProperty(ref _templateStatusMessage, value);
         }
 
         public ICommand SetTodayCommand { get; }
@@ -95,13 +85,13 @@ namespace Dynamologio.App.ViewModels
             IStrengthCalculator strengthCalculator,
             IReportGeneratorService reportService,
             IClock clock,
-            MainViewModel mainVM)
+            IShellStateService shellState)
         {
             _uow = uow;
             _strengthCalculator = strengthCalculator;
             _reportService = reportService;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
 
             _selectedDate = _clock.Today;
 
@@ -109,6 +99,11 @@ namespace Dynamologio.App.ViewModels
             SetTomorrowCommand = new RelayCommand(_ => SelectedDate = _clock.Today.AddDays(1));
             ExportExcelCommand = new RelayCommand(ExportToExcel);
             PrintReportCommand = new RelayCommand(PrintReport);
+        }
+
+        public void Activate()
+        {
+            LoadData();
         }
 
         public void LoadData()
@@ -131,23 +126,17 @@ namespace Dynamologio.App.ViewModels
             switch (status)
             {
                 case TemplateVerificationStatus.Verified:
-                    TemplateStatusText = "Πρότυπο: Επαληθευμένο (SHA-256)";
-                    TemplateStatusBrush = new SolidColorBrush(Color.FromRgb(5, 150, 105)); // Green
-                    TemplateStatusBgBrush = new SolidColorBrush(Color.FromRgb(236, 253, 245));
-                    TemplateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(167, 243, 208));
+                    TemplateStatus = TemplateVerificationState.Verified;
+                    TemplateStatusMessage = "Πρότυπο: Επαληθευμένο (SHA-256)";
                     break;
                 case TemplateVerificationStatus.ShaMismatch:
-                    TemplateStatusText = "Πρότυπο: Ασυμφωνία SHA-256";
-                    TemplateStatusBrush = new SolidColorBrush(Color.FromRgb(220, 38, 38)); // Red
-                    TemplateStatusBgBrush = new SolidColorBrush(Color.FromRgb(254, 242, 242));
-                    TemplateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(254, 202, 202));
+                    TemplateStatus = TemplateVerificationState.ShaMismatch;
+                    TemplateStatusMessage = "Πρότυπο: Ασυμφωνία SHA-256";
                     break;
                 case TemplateVerificationStatus.Missing:
                 default:
-                    TemplateStatusText = "Πρότυπο: Μη Διαθέσιμο";
-                    TemplateStatusBrush = new SolidColorBrush(Color.FromRgb(217, 119, 6)); // Amber
-                    TemplateStatusBgBrush = new SolidColorBrush(Color.FromRgb(255, 251, 235));
-                    TemplateStatusBorderBrush = new SolidColorBrush(Color.FromRgb(253, 230, 138));
+                    TemplateStatus = TemplateVerificationState.Missing;
+                    TemplateStatusMessage = "Πρότυπο: Μη Διαθέσιμο";
                     break;
             }
         }
@@ -169,9 +158,10 @@ namespace Dynamologio.App.ViewModels
 
         private void ExportToExcel()
         {
+            // Will be moved to IFileDialogService + INotificationService in Commit 2
             try
             {
-                var sfd = new SaveFileDialog
+                var sfd = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "Excel Workbook (*.xlsx)|*.xlsx",
                     FileName = $"ΔΥΝΑΜΟΛΟΓΙΟ_{SelectedDate:yyyyMMdd}.xlsx"
@@ -184,21 +174,22 @@ namespace Dynamologio.App.ViewModels
                         Type = ReportType.DailyDynamologio,
                         AsOfTimestamp = SelectedDate,
                         OrganisationUnitId = SelectedUnit?.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null,
-                        UnitTitle = _mainVM.UnitNameHeader
+                        UnitTitle = _shellState.UnitName
                     };
 
                     _reportService.ExportToExcel(req, sfd.FileName);
-                    MessageBox.Show($"Το αρχείο Excel εξήχθη επιτυχώς:\n{sfd.FileName}", "Εξαγωγή Δυναμολογίου", MessageBoxButton.OK, MessageBoxImage.Information);
+                    System.Windows.MessageBox.Show($"Το αρχείο Excel εξήχθη επιτυχώς:\n{sfd.FileName}", "Εξαγωγή Δυναμολογίου", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Σφάλμα εξαγωγής: {ex.Message}", "Σφάλμα", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Σφάλμα εξαγωγής: {ex.Message}", "Σφάλμα", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
         private void PrintReport()
         {
+            // Will be moved to IPrintService in Commit 2
             try
             {
                 var printDialog = new System.Windows.Controls.PrintDialog();
@@ -209,17 +200,17 @@ namespace Dynamologio.App.ViewModels
                         Type = ReportType.DailyDynamologio,
                         AsOfTimestamp = SelectedDate,
                         OrganisationUnitId = SelectedUnit?.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null,
-                        UnitTitle = _mainVM.UnitNameHeader
+                        UnitTitle = _shellState.UnitName
                     };
 
                     var doc = _reportService.GeneratePrintableDocument(req);
-                    IDocumentPaginatorSource dps = doc;
+                    System.Windows.Documents.IDocumentPaginatorSource dps = doc;
                     printDialog.PrintDocument(dps.DocumentPaginator, "Ημερήσιο Δυναμολόγιο");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Σφάλμα εκτύπωσης: {ex.Message}", "Σφάλμα", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Σφάλμα εκτύπωσης: {ex.Message}", "Σφάλμα", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
     }

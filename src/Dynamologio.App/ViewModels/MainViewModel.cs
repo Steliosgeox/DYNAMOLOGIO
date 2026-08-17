@@ -1,33 +1,23 @@
 using System;
 using System.Linq;
 using System.Windows.Input;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Interfaces;
-using Dynamologio.Core.Models;
-using Dynamologio.ImportExport.Excel.Import;
-using Dynamologio.Infrastructure.Services;
-using Dynamologio.Reporting.Services;
 
 namespace Dynamologio.App.ViewModels
 {
+    /// <summary>
+    /// Shell-only coordinator. Owns current ViewModel, active section, and deployment header.
+    /// Does NOT construct child ViewModels. Does NOT own the service graph.
+    /// </summary>
     public class MainViewModel : ViewModelBase
     {
-        private readonly IUnitOfWork _uow;
-        private readonly IStatusEngine _statusEngine;
-        private readonly IStrengthCalculator _strengthCalculator;
-        private readonly IConflictEngine _conflictEngine;
-        private readonly IReportGeneratorService _reportService;
-        private readonly IExcelImportService _importService;
-        private readonly IBackupService _backupService;
-        private readonly IDatabaseLifecycleCoordinator _lifecycleCoordinator;
-        private readonly IDiagnosticPackageService _diagnosticService;
-        private readonly IAuditService _auditService;
-        private readonly IPersonnelService _personnelService;
-        private readonly IAbsenceService _absenceService;
-        private readonly IDutyService _dutyService;
-        private readonly IClock _clock;
+        private readonly INavigationService _navigationService;
+        private readonly IViewModelFactory _viewModelFactory;
+        private readonly IShellStateService _shellState;
 
         private object _currentViewModel;
-        private string _activeSection = "Dashboard";
+        private NavigationSection _activeSection = NavigationSection.Dashboard;
         private string _unitNameHeader = "ΜΟΝΑΔΑ";
         private string _officeNameHeader = "1ο ΓΡΑΦΕΙΟ";
 
@@ -37,7 +27,7 @@ namespace Dynamologio.App.ViewModels
             set => SetProperty(ref _currentViewModel, value);
         }
 
-        public string ActiveSection
+        public NavigationSection ActiveSection
         {
             get => _activeSection;
             set => SetProperty(ref _activeSection, value);
@@ -55,145 +45,82 @@ namespace Dynamologio.App.ViewModels
             set => SetProperty(ref _officeNameHeader, value);
         }
 
-        public DashboardViewModel DashboardVM { get; }
-        public DynamologioViewModel DynamologioVM { get; }
-        public PersonnelViewModel PersonnelVM { get; }
-        public AbsencesViewModel AbsencesVM { get; }
-        public ServicesViewModel ServicesVM { get; }
-        public ReportsViewModel ReportsVM { get; }
-        public ImportExportViewModel ImportExportVM { get; }
-        public HistoryViewModel HistoryVM { get; }
-        public DataValidationViewModel DataValidationVM { get; }
-        public SettingsViewModel SettingsVM { get; }
-
         public ICommand NavigateCommand { get; }
 
         public MainViewModel(
-            IUnitOfWork uow,
-            IStatusEngine statusEngine,
-            IStrengthCalculator strengthCalculator,
-            IConflictEngine conflictEngine,
-            IReportGeneratorService reportService,
-            IExcelImportService importService,
-            IBackupService backupService,
-            IDatabaseLifecycleCoordinator lifecycleCoordinator,
-            IDiagnosticPackageService diagnosticService,
-            IAuditService auditService,
-            IClock clock,
-            IPersonnelService personnelService = null,
-            IAbsenceService absenceService = null,
-            IDutyService dutyService = null)
+            INavigationService navigationService,
+            IViewModelFactory viewModelFactory,
+            IShellStateService shellState,
+            IUnitOfWork uow)
         {
-            _uow = uow ?? throw new ArgumentNullException(nameof(uow));
-            _statusEngine = statusEngine ?? throw new ArgumentNullException(nameof(statusEngine));
-            _strengthCalculator = strengthCalculator ?? throw new ArgumentNullException(nameof(strengthCalculator));
-            _conflictEngine = conflictEngine ?? throw new ArgumentNullException(nameof(conflictEngine));
-            _reportService = reportService ?? throw new ArgumentNullException(nameof(reportService));
-            _importService = importService ?? throw new ArgumentNullException(nameof(importService));
-            _backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
-            _lifecycleCoordinator = lifecycleCoordinator;
-            _diagnosticService = diagnosticService ?? throw new ArgumentNullException(nameof(diagnosticService));
-            _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
-            _clock = clock ?? SystemClock.Instance;
+            _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+            _viewModelFactory = viewModelFactory ?? throw new ArgumentNullException(nameof(viewModelFactory));
+            _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
 
-            _personnelService = personnelService ?? new PersonnelService(_uow, _auditService);
-            _absenceService = absenceService ?? new AbsenceService(_uow, _auditService);
-            _dutyService = dutyService ?? new DutyService(_uow, _auditService);
+            // Subscribe to navigation events
+            _navigationService.Navigated += OnNavigated;
 
-            DashboardVM = new DashboardViewModel(_uow, _strengthCalculator, _clock, this);
-            DynamologioVM = new DynamologioViewModel(_uow, _strengthCalculator, _reportService, _clock, this);
-            PersonnelVM = new PersonnelViewModel(_uow, _statusEngine, _conflictEngine, _personnelService, _clock, this);
-            AbsencesVM = new AbsencesViewModel(_uow, _statusEngine, _conflictEngine, _absenceService, _clock, this);
-            ServicesVM = new ServicesViewModel(_uow, _conflictEngine, _dutyService, _clock, this);
-            ReportsVM = new ReportsViewModel(_uow, _strengthCalculator, _reportService, _clock, this);
-            ImportExportVM = new ImportExportViewModel(_uow, _importService, this);
-            HistoryVM = new HistoryViewModel(_uow, _clock, this);
-            DataValidationVM = new DataValidationViewModel(_uow, _conflictEngine, _statusEngine, _clock, this);
-            SettingsVM = new SettingsViewModel(_uow, _backupService, _lifecycleCoordinator, _diagnosticService, _clock, this);
+            // Subscribe to shell state changes
+            _shellState.DeploymentHeaderChanged += OnDeploymentHeaderChanged;
+            _shellState.FullRefreshRequested += OnFullRefreshRequested;
 
-            NavigateCommand = new RelayCommand(param => Navigate(param as string));
+            NavigateCommand = new RelayCommand(param =>
+            {
+                if (param is NavigationSection section)
+                {
+                    _navigationService.Navigate(section);
+                }
+                else if (param is string sectionName && Enum.TryParse(sectionName, out NavigationSection parsed))
+                {
+                    _navigationService.Navigate(parsed);
+                }
+            });
 
-            // Load deployment settings
-            var uSetting = _uow.AppSettings.Find(s => s.Key == "Deployment.UnitName").FirstOrDefault();
-            if (uSetting != null && !string.IsNullOrWhiteSpace(uSetting.Value)) UnitNameHeader = uSetting.Value;
+            // Load deployment settings from database
+            if (uow != null)
+            {
+                var uSetting = uow.AppSettings.Find(s => s.Key == "Deployment.UnitName").FirstOrDefault();
+                if (uSetting != null && !string.IsNullOrWhiteSpace(uSetting.Value))
+                {
+                    UnitNameHeader = uSetting.Value;
+                    _shellState.UpdateDeploymentHeader(uSetting.Value, _shellState.OfficeName);
+                }
 
-            var oSetting = _uow.AppSettings.Find(s => s.Key == "Deployment.OfficeName").FirstOrDefault();
-            if (oSetting != null && !string.IsNullOrWhiteSpace(oSetting.Value)) OfficeNameHeader = oSetting.Value;
+                var oSetting = uow.AppSettings.Find(s => s.Key == "Deployment.OfficeName").FirstOrDefault();
+                if (oSetting != null && !string.IsNullOrWhiteSpace(oSetting.Value))
+                {
+                    OfficeNameHeader = oSetting.Value;
+                    _shellState.UpdateDeploymentHeader(_shellState.UnitName, oSetting.Value);
+                }
+            }
 
-            Navigate("Dashboard");
+            // Navigate to Dashboard on startup
+            _navigationService.Navigate(NavigationSection.Dashboard);
         }
 
-        public void UpdateDeploymentHeader(string unit, string office)
-        {
-            UnitNameHeader = unit;
-            OfficeNameHeader = office;
-        }
-
-        public void RefreshCurrentView()
-        {
-            Navigate(ActiveSection);
-        }
-
-        public void RefreshAllViewModels()
-        {
-            DashboardVM.LoadData();
-            DynamologioVM.LoadData();
-            PersonnelVM.LoadData();
-            AbsencesVM.LoadData();
-            ServicesVM.LoadData();
-            ReportsVM.LoadData();
-            DataValidationVM.LoadData();
-            HistoryVM.LoadData();
-            SettingsVM.LoadData();
-            RefreshCurrentView();
-        }
-
-        public void Navigate(string section)
+        private void OnNavigated(NavigationSection section)
         {
             ActiveSection = section;
+            var vm = _viewModelFactory.Create(section);
 
-            switch (section)
+            if (vm is IActivatableViewModel activatable)
             {
-                case "Dashboard":
-                    DashboardVM.LoadData();
-                    CurrentViewModel = DashboardVM;
-                    break;
-                case "Dynamologio":
-                    DynamologioVM.LoadData();
-                    CurrentViewModel = DynamologioVM;
-                    break;
-                case "Personnel":
-                    PersonnelVM.LoadData();
-                    CurrentViewModel = PersonnelVM;
-                    break;
-                case "Absences":
-                    AbsencesVM.LoadData();
-                    CurrentViewModel = AbsencesVM;
-                    break;
-                case "Services":
-                    ServicesVM.LoadData();
-                    CurrentViewModel = ServicesVM;
-                    break;
-                case "Reports":
-                    ReportsVM.LoadData();
-                    CurrentViewModel = ReportsVM;
-                    break;
-                case "ImportExport":
-                    CurrentViewModel = ImportExportVM;
-                    break;
-                case "DataValidation":
-                    DataValidationVM.LoadData();
-                    CurrentViewModel = DataValidationVM;
-                    break;
-                case "History":
-                    HistoryVM.LoadData();
-                    CurrentViewModel = HistoryVM;
-                    break;
-                case "Settings":
-                    SettingsVM.LoadData();
-                    CurrentViewModel = SettingsVM;
-                    break;
+                activatable.Activate();
             }
+
+            CurrentViewModel = vm;
+        }
+
+        private void OnDeploymentHeaderChanged()
+        {
+            UnitNameHeader = _shellState.UnitName;
+            OfficeNameHeader = _shellState.OfficeName;
+        }
+
+        private void OnFullRefreshRequested()
+        {
+            // Re-navigate to the current section to reload data
+            _navigationService.Navigate(ActiveSection);
         }
     }
 }

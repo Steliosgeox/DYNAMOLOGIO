@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows;
 using System.Windows.Input;
+using Dynamologio.App.Navigation;
 using Dynamologio.App.Views;
 using Dynamologio.Core.Enums;
 using Dynamologio.Core.Interfaces;
@@ -13,14 +13,13 @@ using Dynamologio.Infrastructure.Services;
 
 namespace Dynamologio.App.ViewModels
 {
-    public class PersonnelViewModel : ViewModelBase
+    public class PersonnelViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IStatusEngine _statusEngine;
         private readonly IConflictEngine _conflictEngine;
         private readonly IPersonnelService _personnelService;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
 
         private string _searchText = string.Empty;
         private string _selectedCategoryFilter = "Όλοι";
@@ -77,19 +76,22 @@ namespace Dynamologio.App.ViewModels
             IStatusEngine statusEngine,
             IConflictEngine conflictEngine,
             IPersonnelService personnelService,
-            IClock clock,
-            MainViewModel mainVM)
+            IClock clock)
         {
             _uow = uow;
             _statusEngine = statusEngine;
             _conflictEngine = conflictEngine;
             _personnelService = personnelService;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
             AddPersonCommand = new RelayCommand(AddPerson);
             EditPersonCommand = new RelayCommand(EditPerson, () => SelectedPerson != null);
             ArchivePersonCommand = new RelayCommand(ArchivePerson, () => SelectedPerson != null);
+        }
+
+        public void Activate()
+        {
+            LoadData();
         }
 
         public void LoadData()
@@ -190,13 +192,14 @@ namespace Dynamologio.App.ViewModels
         private void ArchivePerson()
         {
             if (SelectedPerson?.Person == null) return;
-            var res = MessageBox.Show(
+            // Will be moved to IConfirmationService in Commit 2
+            var res = System.Windows.MessageBox.Show(
                 $"Θα αρχειοθετηθεί ο:\n{SelectedPerson.Rank?.ShortName} {SelectedPerson.Person.FullName}\n\nΗ εγγραφή θα παραμείνει διαθέσιμη στο ιστορικό.\nΣυνέχεια;",
                 "Επιβεβαίωση Αρχειοθέτησης",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question);
 
-            if (res == MessageBoxResult.Yes)
+            if (res == System.Windows.MessageBoxResult.Yes)
             {
                 _personnelService.ArchivePerson(SelectedPerson.Person.Id, $"Αρχειοθέτηση {SelectedPerson.Person.FullName}");
                 LoadData();

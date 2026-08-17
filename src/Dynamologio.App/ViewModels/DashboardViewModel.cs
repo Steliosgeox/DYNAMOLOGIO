@@ -2,17 +2,18 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
+using Dynamologio.App.Navigation;
 using Dynamologio.Core.Interfaces;
 using Dynamologio.Core.Projections;
 
 namespace Dynamologio.App.ViewModels
 {
-    public class DashboardViewModel : ViewModelBase
+    public class DashboardViewModel : ViewModelBase, IActivatableViewModel
     {
         private readonly IUnitOfWork _uow;
         private readonly IStrengthCalculator _strengthCalculator;
         private readonly IClock _clock;
-        private readonly MainViewModel _mainVM;
+        private readonly INavigationService _navigationService;
 
         public UnitStrengthSnapshot Snapshot { get; private set; }
 
@@ -31,17 +32,22 @@ namespace Dynamologio.App.ViewModels
         public ICommand NavigateToPersonnelCommand { get; }
         public ICommand NavigateToServicesCommand { get; }
 
-        public DashboardViewModel(IUnitOfWork uow, IStrengthCalculator strengthCalculator, IClock clock, MainViewModel mainVM)
+        public DashboardViewModel(IUnitOfWork uow, IStrengthCalculator strengthCalculator, IClock clock, INavigationService navigationService)
         {
             _uow = uow;
             _strengthCalculator = strengthCalculator;
-            _clock = clock ?? SystemClock.Instance;
-            _mainVM = mainVM;
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
 
-            NavigateToDynamologioCommand = new RelayCommand(() => _mainVM.Navigate("Dynamologio"));
-            NavigateToAbsencesCommand = new RelayCommand(() => _mainVM.Navigate("Absences"));
-            NavigateToPersonnelCommand = new RelayCommand(() => _mainVM.Navigate("Personnel"));
-            NavigateToServicesCommand = new RelayCommand(() => _mainVM.Navigate("Services"));
+            NavigateToDynamologioCommand = new RelayCommand(() => _navigationService.Navigate(NavigationSection.Dynamologio));
+            NavigateToAbsencesCommand = new RelayCommand(() => _navigationService.Navigate(NavigationSection.Absences));
+            NavigateToPersonnelCommand = new RelayCommand(() => _navigationService.Navigate(NavigationSection.Personnel));
+            NavigateToServicesCommand = new RelayCommand(() => _navigationService.Navigate(NavigationSection.Services));
+        }
+
+        public void Activate()
+        {
+            LoadData();
         }
 
         public void LoadData()
