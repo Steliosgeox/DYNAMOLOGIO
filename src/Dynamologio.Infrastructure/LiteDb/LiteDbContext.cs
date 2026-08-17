@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
+using Dynamologio.Infrastructure.Security;
 using LiteDB;
 
 namespace Dynamologio.Infrastructure.LiteDb
@@ -14,11 +14,21 @@ namespace Dynamologio.Infrastructure.LiteDb
         private bool _disposed = false;
         private readonly string _dbPath;
         private readonly string _password;
+        private readonly IKeyProtectionProvider _keyProvider;
 
         public string DbFilePath => _dbPath;
+        public string DatabasePassword => _password;
+        public LiteDbContext() : this(null, null, null) { }
+        public LiteDbContext(string customDbPath) : this(customDbPath, null, null) { }
+        public LiteDbContext(IKeyProtectionProvider keyProvider) : this(null, null, keyProvider) { }
 
-        public LiteDbContext(string customDbPath = null, string explicitPassword = null)
+        public LiteDbContext(
+            string customDbPath = null,
+            string explicitPassword = null,
+            IKeyProtectionProvider keyProvider = null)
         {
+            _keyProvider = keyProvider;
+
             if (!string.IsNullOrWhiteSpace(customDbPath))
             {
                 _dbPath = customDbPath;
@@ -38,14 +48,19 @@ namespace Dynamologio.Infrastructure.LiteDb
                 _dbPath = Path.Combine(dataFolder, "dynamologio.db");
             }
 
-            // Resolve DPAPI-protected master key
+            // Resolve master encryption password
             if (explicitPassword != null)
             {
                 _password = explicitPassword;
             }
+            else if (_keyProvider != null)
+            {
+                _password = _keyProvider.GetDatabaseMasterPassword();
+            }
             else if (string.IsNullOrWhiteSpace(customDbPath))
             {
-                _password = GetOrGenerateDpapiMasterKey();
+                var defaultProvider = new DpapiProtectionProvider();
+                _password = defaultProvider.GetDatabaseMasterPassword();
             }
             else
             {
@@ -115,42 +130,6 @@ namespace Dynamologio.Infrastructure.LiteDb
             }
         }
 
-        private static string GetOrGenerateDpapiMasterKey()
-        {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            if (string.IsNullOrEmpty(appData))
-            {
-                appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            }
-            string configFolder = Path.Combine(appData, "Dynamologio", "Config");
-            if (!Directory.Exists(configFolder))
-            {
-                Directory.CreateDirectory(configFolder);
-            }
-
-            string keyFile = Path.Combine(configFolder, "master.key");
-            byte[] entropy = Encoding.UTF8.GetBytes("DynamologioDPAPIMasterKeyEntropyV4");
-
-            if (File.Exists(keyFile))
-            {
-                byte[] protectedBytes = File.ReadAllBytes(keyFile);
-                byte[] rawBytes = ProtectedData.Unprotect(protectedBytes, entropy, DataProtectionScope.LocalMachine);
-                return Convert.ToBase64String(rawBytes);
-            }
-            else
-            {
-                byte[] rawKey = new byte[32];
-                using (var rng = new RNGCryptoServiceProvider())
-                {
-                    rng.GetBytes(rawKey);
-                }
-
-                byte[] protectedBytes = ProtectedData.Protect(rawKey, entropy, DataProtectionScope.LocalMachine);
-                File.WriteAllBytes(keyFile, protectedBytes);
-                return Convert.ToBase64String(rawKey);
-            }
-        }
-
         public static void MigrateLegacyPlaintextDbIfNeeded(string dbFilePath, string targetPassword)
         {
             if (!File.Exists(dbFilePath) || string.IsNullOrEmpty(targetPassword)) return;
@@ -174,12 +153,12 @@ namespace Dynamologio.Infrastructure.LiteDb
             if (!isPlaintext) return; // Already encrypted or new file
 
             // Perform atomic rebuild/migration to encrypted format
-            string backupPath = dbFilePath + ".plaintext.bak";
             string stagingEncryptedPath = dbFilePath + ".encrypted.staging";
+            string tempLegacyBackupPath = dbFilePath + ".migration_temp.bak";
 
             try
             {
-                File.Copy(dbFilePath, backupPath, true);
+                File.Copy(dbFilePath, tempLegacyBackupPath, true);
 
                 if (File.Exists(stagingEncryptedPath)) File.Delete(stagingEncryptedPath);
 
@@ -194,6 +173,12 @@ namespace Dynamologio.Infrastructure.LiteDb
                         {
                             encCol.Insert(doc);
                         }
+
+                        // Validate collection counts match
+                        if (plainCol.Count() != encCol.Count())
+                        {
+                            throw new InvalidOperationException($"Ασυμφωνία πλήθους εγγραφών κατά τη μετανάστευση στη συλλογή '{colName}'.");
+                        }
                     }
                 }
 
@@ -206,6 +191,22 @@ namespace Dynamologio.Infrastructure.LiteDb
                 // Atomically replace live DB with encrypted DB
                 File.Copy(stagingEncryptedPath, dbFilePath, true);
                 if (File.Exists(stagingEncryptedPath)) File.Delete(stagingEncryptedPath);
+
+                // SEC-002: Securely purge temporary plaintext copy so ZERO plaintext database files remain
+                if (File.Exists(tempLegacyBackupPath))
+                {
+                    try
+                    {
+                        // Overwrite with zeroes before deletion
+                        byte[] zeroes = new byte[new FileInfo(tempLegacyBackupPath).Length];
+                        File.WriteAllBytes(tempLegacyBackupPath, zeroes);
+                        File.Delete(tempLegacyBackupPath);
+                    }
+                    catch
+                    {
+                        File.Delete(tempLegacyBackupPath);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -215,9 +216,10 @@ namespace Dynamologio.Infrastructure.LiteDb
                 }
 
                 // Restore original plaintext backup if live DB was touched
-                if (File.Exists(backupPath))
+                if (File.Exists(tempLegacyBackupPath))
                 {
-                    try { File.Copy(backupPath, dbFilePath, true); } catch { }
+                    try { File.Copy(tempLegacyBackupPath, dbFilePath, true); } catch { }
+                    try { File.Delete(tempLegacyBackupPath); } catch { }
                 }
 
                 throw new InvalidOperationException($"Αποτυχία κρυπτογράφησης υπάρχουσας βάσης δεδομένων: {ex.Message}", ex);

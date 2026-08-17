@@ -12,6 +12,7 @@ using Dynamologio.ImportExport.Excel.Import;
 using Dynamologio.Infrastructure.LiteDb;
 using Dynamologio.Infrastructure.Migrations;
 using Dynamologio.Infrastructure.Repositories;
+using Dynamologio.Infrastructure.Security;
 using Dynamologio.Infrastructure.Services;
 using Dynamologio.Reporting.Services;
 
@@ -55,7 +56,8 @@ namespace Dynamologio.App
             try
             {
                 // 2. Initialize Database & Run Schema Migrations
-                _dbContext = new LiteDbContext();
+                IKeyProtectionProvider keyProvider = new DpapiProtectionProvider();
+                _dbContext = new LiteDbContext(keyProvider: keyProvider);
                 _unitOfWork = new LiteDbUnitOfWork(_dbContext);
 
                 var migrationRunner = new SchemaMigrationRunner(_unitOfWork);
@@ -67,7 +69,8 @@ namespace Dynamologio.App
                 IStrengthCalculator strengthCalculator = new StrengthCalculationEngine(statusEngine);
                 IConflictEngine conflictEngine = new ConflictEngine();
                 IAuditService auditService = new AuditService(_unitOfWork);
-                IBackupService backupService = new BackupService(_unitOfWork, _dbContext.DbFilePath);
+                IBackupService backupService = new BackupService(_unitOfWork, _dbContext.DbFilePath, keyProvider);
+                IDatabaseLifecycleCoordinator lifecycleCoordinator = new DatabaseLifecycleCoordinator(_dbContext, backupService, keyProvider);
                 IDiagnosticPackageService diagnosticService = new DiagnosticPackageService(_unitOfWork, _dbContext.DbFilePath);
 
                 IPersonnelService personnelService = new PersonnelService(_unitOfWork, auditService);
@@ -97,6 +100,7 @@ namespace Dynamologio.App
                     reportService,
                     importService,
                     backupService,
+                    lifecycleCoordinator,
                     diagnosticService,
                     auditService,
                     clock,
@@ -142,14 +146,20 @@ namespace Dynamologio.App
                 }
 
                 string logFile = Path.Combine(logFolder, "app_crash.log");
-                string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}] {ex.GetType().FullName}: {ex.Message}\nStackTrace:\n{ex.StackTrace}\n\n";
+                string logEntry = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss UTC}] [{source}] {ex}\n----------------------------------------\n";
+                File.AppendAllText(logFile, logEntry);
+            }
+            catch { }
+        }
 
-                File.AppendAllText(logFile, entry);
-            }
-            catch
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try
             {
-                // Fallback suppression for logger failure
+                _dbContext?.Dispose();
             }
+            catch { }
+            base.OnExit(e);
         }
     }
 }
