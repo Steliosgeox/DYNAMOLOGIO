@@ -35,8 +35,8 @@ namespace Dynamologio.App.ViewModels
 
     public class AbsencesViewModel : ViewModelBase, IActivatableViewModel
     {
-        private readonly IUnitOfWork _uow;
-        private readonly IStatusEngine _statusEngine;
+        private readonly IPersonnelQueryService _personnelQueryService;
+        private readonly IAbsenceQueryService _absenceQueryService;
         private readonly IConflictEngine _conflictEngine;
         private readonly IAbsenceService _absenceService;
         private readonly IClock _clock;
@@ -145,16 +145,16 @@ namespace Dynamologio.App.ViewModels
         public ICommand CancelAbsenceCommand { get; }
 
         public AbsencesViewModel(
-            IUnitOfWork uow,
-            IStatusEngine statusEngine,
+            IPersonnelQueryService personnelQueryService,
+            IAbsenceQueryService absenceQueryService,
             IConflictEngine conflictEngine,
             IAbsenceService absenceService,
             IClock clock,
             INotificationService notificationService,
             IConfirmationService confirmationService)
         {
-            _uow = uow;
-            _statusEngine = statusEngine;
+            _personnelQueryService = personnelQueryService ?? throw new ArgumentNullException(nameof(personnelQueryService));
+            _absenceQueryService = absenceQueryService ?? throw new ArgumentNullException(nameof(absenceQueryService));
             _conflictEngine = conflictEngine;
             _absenceService = absenceService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -187,18 +187,20 @@ namespace Dynamologio.App.ViewModels
 
         public void LoadData()
         {
-            var ranks = _uow.Ranks.GetAll().ToDictionary(r => r.Id);
-            var units = _uow.OrganisationUnits.GetAll().ToDictionary(u => u.Id);
-            var persons = _uow.Personnel.GetAll().ToDictionary(p => p.Id);
-            var stTypes = _uow.StatusTypes.GetAll().ToDictionary(st => st.Id);
+            var ranks = _personnelQueryService.GetAllRanks().ToDictionary(r => r.Id);
+            var units = _personnelQueryService.GetAllUnits().ToDictionary(u => u.Id);
+            // We use GetActivePersonnel and GetAbsenceHistory below, no need for full Person dict right now
+            var stTypes = _absenceQueryService.GetStatusTypes().ToDictionary(st => st.Id);
 
             StatusTypesList.Clear();
-            foreach (var st in _uow.StatusTypes.GetAll().OrderBy(x => x.SortOrder)) StatusTypesList.Add(st);
+            foreach (var st in _absenceQueryService.GetStatusTypes()) StatusTypesList.Add(st);
             if (SelectedStatusType == null) SelectedStatusType = StatusTypesList.FirstOrDefault();
 
             PersonnelList.Clear();
             SearchablePersonnelList.Clear();
-            foreach (var p in _uow.Personnel.Find(x => !x.IsArchived).OrderBy(x => x.LastName))
+            var activePersonnel = _personnelQueryService.GetActivePersonnel().OrderBy(x => x.LastName);
+            var personsDict = new Dictionary<Guid, Personnel>();
+            foreach (var p in activePersonnel)
             {
                 PersonnelList.Add(p);
                 ranks.TryGetValue(p.RankId, out var rank);
@@ -212,6 +214,7 @@ namespace Dynamologio.App.ViewModels
                     DisplayAsm = p.MilitaryServiceNumber ?? "",
                     Specialty = p.Specialty ?? ""
                 });
+                personsDict[p.Id] = p;
             }
             if (SelectedPerson == null) SelectedPerson = PersonnelList.FirstOrDefault();
 
@@ -221,10 +224,15 @@ namespace Dynamologio.App.ViewModels
             PlannedEventsList.Clear();
             PastEventsList.Clear();
 
-            var allEvents = _uow.StatusEvents.Find(x => !x.IsCancelled).OrderByDescending(x => x.StartAt).ToList();
+            var allEvents = _absenceQueryService.GetAllEvents();
             foreach (var ev in allEvents)
             {
-                persons.TryGetValue(ev.PersonnelId, out var person);
+                personsDict.TryGetValue(ev.PersonnelId, out var person);
+                // Fallback for archived persons in history
+                if (person == null)
+                {
+                    person = _personnelQueryService.GetPerson(ev.PersonnelId);
+                }
                 Rank rank2 = null;
                 OrganisationUnit unit2 = null;
                 if (person != null)
@@ -291,7 +299,7 @@ namespace Dynamologio.App.ViewModels
                 EndAtExclusive = endExclusive
             };
 
-            var existingEvents = _uow.StatusEvents.Find(e => e.PersonnelId == SelectedPerson.Id);
+            var existingEvents = _absenceQueryService.GetEventsForPerson(SelectedPerson.Id);
             var conflicts = _conflictEngine.ValidateStatusEvent(tempEvent, SelectedPerson, existingEvents, StatusTypesList);
 
             var error = conflicts.FirstOrDefault(c => c.Severity == ConflictSeverity.Error);

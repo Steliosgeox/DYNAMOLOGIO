@@ -15,9 +15,7 @@ namespace Dynamologio.App.ViewModels
 {
     public class PersonnelViewModel : ViewModelBase, IActivatableViewModel
     {
-        private readonly IUnitOfWork _uow;
-        private readonly IStatusEngine _statusEngine;
-        private readonly IConflictEngine _conflictEngine;
+        private readonly IPersonnelQueryService _personnelQueryService;
         private readonly IPersonnelService _personnelService;
         private readonly IClock _clock;
         private readonly IPersonEditorDialogService _personEditorDialogService;
@@ -74,17 +72,13 @@ namespace Dynamologio.App.ViewModels
         public ICommand ArchivePersonCommand { get; }
 
         public PersonnelViewModel(
-            IUnitOfWork uow,
-            IStatusEngine statusEngine,
-            IConflictEngine conflictEngine,
+            IPersonnelQueryService personnelQueryService,
             IPersonnelService personnelService,
             IClock clock,
             IPersonEditorDialogService personEditorDialogService,
             IConfirmationService confirmationService)
         {
-            _uow = uow;
-            _statusEngine = statusEngine;
-            _conflictEngine = conflictEngine;
+            _personnelQueryService = personnelQueryService ?? throw new ArgumentNullException(nameof(personnelQueryService));
             _personnelService = personnelService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _personEditorDialogService = personEditorDialogService ?? throw new ArgumentNullException(nameof(personEditorDialogService));
@@ -102,23 +96,9 @@ namespace Dynamologio.App.ViewModels
 
         public void LoadData()
         {
-            var personnel = _uow.Personnel.GetAll().ToList();
-            var ranks = _uow.Ranks.GetAll().ToDictionary(r => r.Id);
-            var units = _uow.OrganisationUnits.GetAll().ToDictionary(u => u.Id);
-            var events = _uow.StatusEvents.GetAll().GroupBy(e => e.PersonnelId).ToDictionary(g => g.Key, g => g.ToList());
-            var statusTypes = _uow.StatusTypes.GetAll().ToList();
-            var services = _uow.ServiceAssignments.GetAll().GroupBy(s => s.PersonnelId).ToDictionary(g => g.Key, g => g.ToList());
-            var serviceTypes = _uow.ServiceTypes.GetAll().ToList();
-
             _allSnapshots.Clear();
-            foreach (var p in personnel)
+            foreach (var sn in _personnelQueryService.GetAllPersonnelStatus(_clock.Now))
             {
-                ranks.TryGetValue(p.RankId, out var rank);
-                units.TryGetValue(p.OrganisationUnitId, out var unit);
-                events.TryGetValue(p.Id, out var pEvents);
-                services.TryGetValue(p.Id, out var pServices);
-
-                var sn = _statusEngine.CalculatePersonStatus(p, pEvents, statusTypes, rank, unit, pServices, serviceTypes, _clock.Now);
                 _allSnapshots.Add(sn);
             }
 
@@ -166,10 +146,10 @@ namespace Dynamologio.App.ViewModels
 
             if (SelectedPerson?.Person == null) return;
 
-            var events = _uow.StatusEvents.Find(e => e.PersonnelId == SelectedPerson.Person.Id).OrderByDescending(e => e.StartAt);
+            var events = _personnelQueryService.GetAbsenceHistory(SelectedPerson.Person.Id);
             foreach (var ev in events) SelectedPersonAbsenceHistory.Add(ev);
 
-            var services = _uow.ServiceAssignments.Find(s => s.PersonnelId == SelectedPerson.Person.Id).OrderByDescending(s => s.ServiceDate);
+            var services = _personnelQueryService.GetServiceHistory(SelectedPerson.Person.Id);
             foreach (var sv in services) SelectedPersonServiceHistory.Add(sv);
         }
 

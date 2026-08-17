@@ -29,7 +29,9 @@ namespace Dynamologio.App.ViewModels
 
     public class ServicesViewModel : ViewModelBase, IActivatableViewModel
     {
-        private readonly IUnitOfWork _uow;
+        private readonly IPersonnelQueryService _personnelQueryService;
+        private readonly IServiceRosterQueryService _serviceQueryService;
+        private readonly IAbsenceQueryService _absenceQueryService;
         private readonly IConflictEngine _conflictEngine;
         private readonly IDutyService _dutyService;
         private readonly IClock _clock;
@@ -75,14 +77,18 @@ namespace Dynamologio.App.ViewModels
         public ICommand SetTomorrowCommand { get; }
 
         public ServicesViewModel(
-            IUnitOfWork uow,
+            IPersonnelQueryService personnelQueryService,
+            IServiceRosterQueryService serviceQueryService,
+            IAbsenceQueryService absenceQueryService,
             IConflictEngine conflictEngine,
             IDutyService dutyService,
             IClock clock,
             INotificationService notificationService,
             IConfirmationService confirmationService)
         {
-            _uow = uow;
+            _personnelQueryService = personnelQueryService ?? throw new ArgumentNullException(nameof(personnelQueryService));
+            _serviceQueryService = serviceQueryService ?? throw new ArgumentNullException(nameof(serviceQueryService));
+            _absenceQueryService = absenceQueryService ?? throw new ArgumentNullException(nameof(absenceQueryService));
             _conflictEngine = conflictEngine;
             _dutyService = dutyService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -105,23 +111,26 @@ namespace Dynamologio.App.ViewModels
         public void LoadData()
         {
             PersonnelList.Clear();
-            foreach (var p in _uow.Personnel.Find(x => !x.IsArchived).OrderBy(x => x.LastName)) PersonnelList.Add(p);
+            foreach (var p in _personnelQueryService.GetActivePersonnel().OrderBy(x => x.LastName)) PersonnelList.Add(p);
             if (SelectedPerson == null) SelectedPerson = PersonnelList.FirstOrDefault();
 
             ServiceTypesList.Clear();
-            foreach (var st in _uow.ServiceTypes.GetAll().OrderBy(x => x.SortOrder)) ServiceTypesList.Add(st);
+            foreach (var st in _serviceQueryService.GetServiceTypes().OrderBy(x => x.SortOrder)) ServiceTypesList.Add(st);
             if (SelectedServiceType == null) SelectedServiceType = ServiceTypesList.FirstOrDefault();
 
-            var ranks = _uow.Ranks.GetAll().ToDictionary(r => r.Id);
-            var persons = _uow.Personnel.GetAll().ToDictionary(p => p.Id);
-            var stTypes = _uow.ServiceTypes.GetAll().ToDictionary(st => st.Id);
+            var ranks = _personnelQueryService.GetAllRanks().ToDictionary(r => r.Id);
+            var persons = _personnelQueryService.GetActivePersonnel().ToDictionary(p => p.Id);
+            var stTypes = _serviceQueryService.GetServiceTypes().ToDictionary(st => st.Id);
 
             DailyServicesList.Clear();
-            var assignments = _uow.ServiceAssignments.Find(s => !s.IsCancelled && s.ServiceDate.Date == SelectedDate.Date).OrderBy(s => s.StartDateTime);
+            var assignments = _serviceQueryService.GetServicesForDate(SelectedDate).Where(s => !s.IsCancelled).OrderBy(s => s.StartDateTime);
 
             foreach (var item in assignments)
             {
-                persons.TryGetValue(item.PersonnelId, out var person);
+                if (!persons.TryGetValue(item.PersonnelId, out var person))
+                {
+                    person = _personnelQueryService.GetPerson(item.PersonnelId);
+                }
                 Rank rank = null;
                 if (person != null) ranks.TryGetValue(person.RankId, out rank);
                 stTypes.TryGetValue(item.ServiceTypeId, out var stType);
@@ -176,8 +185,8 @@ namespace Dynamologio.App.ViewModels
                 Notes = (Notes ?? "").Trim()
             };
 
-            var existingServices = _uow.ServiceAssignments.Find(s => s.PersonnelId == SelectedPerson.Id);
-            var existingAbsences = _uow.StatusEvents.Find(e => e.PersonnelId == SelectedPerson.Id);
+            var existingServices = _personnelQueryService.GetServiceHistory(SelectedPerson.Id);
+            var existingAbsences = _absenceQueryService.GetEventsForPerson(SelectedPerson.Id);
             var conflicts = _conflictEngine.ValidateServiceAssignment(assignment, SelectedPerson, existingServices, existingAbsences);
 
             var error = conflicts.FirstOrDefault(c => c.Severity == ConflictSeverity.Error);

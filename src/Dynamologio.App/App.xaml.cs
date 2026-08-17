@@ -85,6 +85,11 @@ namespace Dynamologio.App
                 IReportGeneratorService reportService = new ReportGeneratorService(_unitOfWork, strengthCalculator, templateWriter);
                 IExcelImportService importService = new ExcelImportService();
 
+                IStrengthQueryService strengthQueryService = new StrengthQueryService(_unitOfWork, strengthCalculator);
+                IPersonnelQueryService personnelQueryService = new PersonnelQueryService(_unitOfWork, statusEngine);
+                IAbsenceQueryService absenceQueryService = new AbsenceQueryService(_unitOfWork);
+                IServiceRosterQueryService serviceQueryService = new ServiceRosterQueryService(_unitOfWork);
+
                 // 4. Automated Daily Backup Check
                 try
                 {
@@ -116,12 +121,12 @@ namespace Dynamologio.App
                 // 6b. Construct ViewModelFactory with a dictionary of delegates
                 var factories = new Dictionary<NavigationSection, Func<ViewModelBase>>
                 {
-                    { NavigationSection.Dashboard, () => new DashboardViewModel(_unitOfWork, strengthCalculator, clock, navigationService) },
-                    { NavigationSection.Dynamologio, () => new DynamologioViewModel(_unitOfWork, strengthCalculator, reportService, clock, shellStateService, printService, fileDialogService, notificationService) },
-                    { NavigationSection.Personnel, () => new PersonnelViewModel(_unitOfWork, statusEngine, conflictEngine, personnelService, clock, personEditorDialogService, confirmationService) },
-                    { NavigationSection.Absences, () => new AbsencesViewModel(_unitOfWork, statusEngine, conflictEngine, absenceService, clock, notificationService, confirmationService) },
-                    { NavigationSection.Services, () => new ServicesViewModel(_unitOfWork, conflictEngine, dutyService, clock, notificationService, confirmationService) },
-                    { NavigationSection.Reports, () => new ReportsViewModel(_unitOfWork, strengthCalculator, reportService, clock, shellStateService, printService, fileDialogService, notificationService) },
+                    { NavigationSection.Dashboard, () => new DashboardViewModel(strengthQueryService, clock, navigationService) },
+                    { NavigationSection.Dynamologio, () => new DynamologioViewModel(strengthQueryService, personnelQueryService, reportService, clock, shellStateService, printService, fileDialogService, notificationService) },
+                    { NavigationSection.Personnel, () => new PersonnelViewModel(personnelQueryService, personnelService, clock, personEditorDialogService, confirmationService) },
+                    { NavigationSection.Absences, () => new AbsencesViewModel(personnelQueryService, absenceQueryService, conflictEngine, absenceService, clock, notificationService, confirmationService) },
+                    { NavigationSection.Services, () => new ServicesViewModel(personnelQueryService, serviceQueryService, absenceQueryService, conflictEngine, dutyService, clock, notificationService, confirmationService) },
+                    { NavigationSection.Reports, () => new ReportsViewModel(personnelQueryService, strengthQueryService, reportService, clock, shellStateService, printService, fileDialogService, notificationService) },
                     { NavigationSection.ImportExport, () => new ImportExportViewModel(_unitOfWork, importService, fileDialogService, notificationService, confirmationService) },
                     { NavigationSection.DataValidation, () => new DataValidationViewModel(_unitOfWork, conflictEngine, statusEngine, clock) },
                     { NavigationSection.History, () => new HistoryViewModel(_unitOfWork, clock) },

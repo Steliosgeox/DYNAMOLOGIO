@@ -20,8 +20,8 @@ namespace Dynamologio.App.ViewModels
 
     public class DynamologioViewModel : ViewModelBase, IActivatableViewModel
     {
-        private readonly IUnitOfWork _uow;
-        private readonly IStrengthCalculator _strengthCalculator;
+        private readonly IStrengthQueryService _strengthQueryService;
+        private readonly IPersonnelQueryService _personnelQueryService;
         private readonly IReportGeneratorService _reportService;
         private readonly IClock _clock;
         private readonly IShellStateService _shellState;
@@ -85,8 +85,8 @@ namespace Dynamologio.App.ViewModels
         public ICommand PrintReportCommand { get; }
 
         public DynamologioViewModel(
-            IUnitOfWork uow,
-            IStrengthCalculator strengthCalculator,
+            IStrengthQueryService strengthQueryService,
+            IPersonnelQueryService personnelQueryService,
             IReportGeneratorService reportService,
             IClock clock,
             IShellStateService shellState,
@@ -94,8 +94,8 @@ namespace Dynamologio.App.ViewModels
             IFileDialogService fileDialogService,
             INotificationService notificationService)
         {
-            _uow = uow;
-            _strengthCalculator = strengthCalculator;
+            _strengthQueryService = strengthQueryService ?? throw new ArgumentNullException(nameof(strengthQueryService));
+            _personnelQueryService = personnelQueryService ?? throw new ArgumentNullException(nameof(personnelQueryService));
             _reportService = reportService;
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _shellState = shellState ?? throw new ArgumentNullException(nameof(shellState));
@@ -120,7 +120,7 @@ namespace Dynamologio.App.ViewModels
         {
             OrganisationUnitsList.Clear();
             OrganisationUnitsList.Add(new OrganisationUnit { Name = "Όλη η Μονάδα (Συνολικό)", Id = Guid.Empty });
-            foreach (var u in _uow.OrganisationUnits.GetAll().OrderBy(x => x.SortOrder))
+            foreach (var u in _personnelQueryService.GetAllUnits().OrderBy(x => x.SortOrder))
             {
                 OrganisationUnitsList.Add(u);
             }
@@ -154,16 +154,7 @@ namespace Dynamologio.App.ViewModels
         private void RefreshCalculations()
         {
             Guid? filterUnitId = SelectedUnit != null && SelectedUnit.Id != Guid.Empty ? (Guid?)SelectedUnit.Id : null;
-
-            var p = _uow.Personnel.GetAll();
-            var ev = _uow.StatusEvents.GetAll();
-            var st = _uow.StatusTypes.GetAll();
-            var rk = _uow.Ranks.GetAll();
-            var un = _uow.OrganisationUnits.GetAll();
-            var sa = _uow.ServiceAssignments.GetAll();
-            var sv = _uow.ServiceTypes.GetAll();
-
-            CurrentSnapshot = _strengthCalculator.CalculateSnapshot(p, ev, st, rk, un, sa, sv, SelectedDate, filterUnitId);
+            CurrentSnapshot = _strengthQueryService.GetStrengthSnapshot(SelectedDate, filterUnitId);
         }
 
         private void ExportToExcel()

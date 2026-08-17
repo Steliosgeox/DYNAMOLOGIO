@@ -10,8 +10,7 @@ namespace Dynamologio.App.ViewModels
 {
     public class DashboardViewModel : ViewModelBase, IActivatableViewModel
     {
-        private readonly IUnitOfWork _uow;
-        private readonly IStrengthCalculator _strengthCalculator;
+        private readonly IStrengthQueryService _strengthQueryService;
         private readonly IClock _clock;
         private readonly INavigationService _navigationService;
 
@@ -32,10 +31,9 @@ namespace Dynamologio.App.ViewModels
         public ICommand NavigateToPersonnelCommand { get; }
         public ICommand NavigateToServicesCommand { get; }
 
-        public DashboardViewModel(IUnitOfWork uow, IStrengthCalculator strengthCalculator, IClock clock, INavigationService navigationService)
+        public DashboardViewModel(IStrengthQueryService strengthQueryService, IClock clock, INavigationService navigationService)
         {
-            _uow = uow;
-            _strengthCalculator = strengthCalculator;
+            _strengthQueryService = strengthQueryService ?? throw new ArgumentNullException(nameof(strengthQueryService));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
 
@@ -52,15 +50,7 @@ namespace Dynamologio.App.ViewModels
 
         public void LoadData()
         {
-            var p = _uow.Personnel.GetAll();
-            var ev = _uow.StatusEvents.GetAll();
-            var st = _uow.StatusTypes.GetAll();
-            var rk = _uow.Ranks.GetAll();
-            var un = _uow.OrganisationUnits.GetAll();
-            var sa = _uow.ServiceAssignments.GetAll();
-            var sv = _uow.ServiceTypes.GetAll();
-
-            Snapshot = _strengthCalculator.CalculateSnapshot(p, ev, st, rk, un, sa, sv, _clock.Now);
+            Snapshot = _strengthQueryService.GetCurrentStrengthSnapshot(_clock.Now);
 
             AbsentPersonnelList.Clear();
             foreach (var a in Snapshot.AbsentPersonnel.OrderBy(x => x.Rank?.SortOrder ?? 99))

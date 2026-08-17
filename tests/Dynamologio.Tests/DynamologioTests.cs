@@ -678,18 +678,23 @@ namespace Dynamologio.Tests
                     var printService = new TestPrintService();
                     var personEditorDialogService = new Dynamologio.App.Services.WpfPersonEditorDialogService(_uow, conflictEngine, personnelService);
 
+                    var strengthQueryService = new StrengthQueryService(_uow, strengthCalc);
+                    var personnelQueryService = new PersonnelQueryService(_uow, statusEngine);
+                    var absenceQueryService = new AbsenceQueryService(_uow);
+                    var serviceQueryService = new ServiceRosterQueryService(_uow);
+
                     var navService = new Dynamologio.App.Navigation.NavigationService();
                     var shellState = new Dynamologio.App.Navigation.ShellStateService();
                     shellState.UpdateDeploymentHeader("ΜΟΝΑΔΑ", "ΓΡΑΦΕΙΟ / ΤΜΗΜΑ");
 
                     var factories = new System.Collections.Generic.Dictionary<Dynamologio.App.Navigation.NavigationSection, Func<Dynamologio.App.ViewModels.ViewModelBase>>
                     {
-                        { Dynamologio.App.Navigation.NavigationSection.Dashboard, () => new DashboardViewModel(_uow, strengthCalc, _clock, navService) },
-                        { Dynamologio.App.Navigation.NavigationSection.Dynamologio, () => new DynamologioViewModel(_uow, strengthCalc, reportService, _clock, shellState, printService, fileDialogService, notificationService) },
-                        { Dynamologio.App.Navigation.NavigationSection.Personnel, () => new PersonnelViewModel(_uow, statusEngine, conflictEngine, personnelService, _clock, personEditorDialogService, confirmationService) },
-                        { Dynamologio.App.Navigation.NavigationSection.Absences, () => new AbsencesViewModel(_uow, statusEngine, conflictEngine, absenceService, _clock, notificationService, confirmationService) },
-                        { Dynamologio.App.Navigation.NavigationSection.Services, () => new ServicesViewModel(_uow, conflictEngine, dutyService, _clock, notificationService, confirmationService) },
-                        { Dynamologio.App.Navigation.NavigationSection.Reports, () => new ReportsViewModel(_uow, strengthCalc, reportService, _clock, shellState, printService, fileDialogService, notificationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Dashboard, () => new DashboardViewModel(strengthQueryService, _clock, navService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Dynamologio, () => new DynamologioViewModel(strengthQueryService, personnelQueryService, reportService, _clock, shellState, printService, fileDialogService, notificationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Personnel, () => new PersonnelViewModel(personnelQueryService, personnelService, _clock, personEditorDialogService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Absences, () => new AbsencesViewModel(personnelQueryService, absenceQueryService, conflictEngine, absenceService, _clock, notificationService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Services, () => new ServicesViewModel(personnelQueryService, serviceQueryService, absenceQueryService, conflictEngine, dutyService, _clock, notificationService, confirmationService) },
+                        { Dynamologio.App.Navigation.NavigationSection.Reports, () => new ReportsViewModel(personnelQueryService, strengthQueryService, reportService, _clock, shellState, printService, fileDialogService, notificationService) },
                         { Dynamologio.App.Navigation.NavigationSection.ImportExport, () => new ImportExportViewModel(_uow, importService, fileDialogService, notificationService, confirmationService) },
                         { Dynamologio.App.Navigation.NavigationSection.DataValidation, () => new DataValidationViewModel(_uow, conflictEngine, statusEngine, _clock) },
                         { Dynamologio.App.Navigation.NavigationSection.History, () => new HistoryViewModel(_uow, _clock) },
